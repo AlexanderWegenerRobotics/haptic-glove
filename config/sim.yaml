@@ -23,10 +23,17 @@ input:
     period: 4.0
     max_closure: 1.0
 
+unreal:
+  enabled: true                    # true | false
+  host: 127.0.0.1
+  state_port: 9870
+  scene_port: 9871
+  rate: 250                        # state packets per second
+  scene_interval: 1.0              # seconds between scene description repeats
+
 scene: scenes/default.yaml
 objects: objects.yaml
 
 recording:
   enabled: true
   directory: ../logs
-  rate: 1000

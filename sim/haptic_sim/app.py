@@ -10,6 +10,7 @@ from .config import CONFIG_DIR, load_object_library, load_scene, load_sim_config
 from .hand import make_hand
 from .inputs import make_finger_source, make_pose_source
 from .loop import PhysicsLoop
+from .outputs import UnrealPublisher
 from .recorder import Recorder, timing_summary
 from .scene import build_model, describe_scene, write_scene_description
 
@@ -25,6 +26,7 @@ def parse_args(argv=None) -> argparse.Namespace:
     p.add_argument("--headless", action="store_true")
     p.add_argument("--duration", type=float)
     p.add_argument("--no-record", action="store_true")
+    p.add_argument("--no-unreal", action="store_true")
     return p.parse_args(argv)
 
 
@@ -44,6 +46,8 @@ def apply_overrides(cfg: dict, args: argparse.Namespace) -> dict:
         cfg["simulation"]["duration"] = args.duration
     if args.no_record:
         cfg["recording"]["enabled"] = False
+    if args.no_unreal:
+        cfg["unreal"]["enabled"] = False
     return cfg
 
 
@@ -71,6 +75,10 @@ def run_viewer(model, data, cfg: dict, start_loop, stop: threading.Event) -> Phy
             pass
         loop.stop()
         loop.join(timeout=2.0)
+        viewer.close()
+        deadline = time.perf_counter() + 2.0
+        while viewer.is_running() and time.perf_counter() < deadline:
+            time.sleep(0.01)
     return loop
 
 
@@ -94,18 +102,24 @@ def main(argv=None) -> None:
     data = mujoco.MjData(model)
     mujoco.mj_forward(model, data)
 
+    hand = make_hand(model, cfg)
     description = describe_scene(scene, cfg)
+    publisher = UnrealPublisher(model, hand, description, cfg) if cfg["unreal"]["enabled"] else None
     scene_path = write_scene_description(description, cfg["recording"]["directory"])
     print(f"scene '{scene.name}' id {description['scene_id']} seed {scene.seed} hand {cfg['hand']['type']}")
     print(f"objects: {', '.join(o.id for o in scene.objects)}")
     print(f"scene description: {scene_path}")
+    if publisher:
+        u = cfg["unreal"]
+        print(f"unreal stream: {u['host']}:{u['state_port']} at {u['rate']} Hz, scene on :{u['scene_port']}")
+        publisher.start()
 
-    hand = make_hand(model, cfg)
     recorder = Recorder(cfg["recording"]["directory"], cfg["recording"]["enabled"])
 
     def start_loop(lock) -> PhysicsLoop:
         '''Create and start the physics thread with the given lock factory.'''
-        loop = PhysicsLoop(model, data, lock, hand, make_pose_source(cfg), make_finger_source(cfg), recorder, cfg)
+        loop = PhysicsLoop(model, data, lock, hand, make_pose_source(cfg), make_finger_source(cfg), recorder, cfg,
+                           publisher)
         loop.start()
         return loop
 
@@ -119,6 +133,8 @@ def main(argv=None) -> None:
         wait_headless(loop, stop)
         loop.stop()
         loop.join(timeout=2.0)
+    if publisher:
+        publisher.stop()
     print("stopped")
 
     rows = recorder.data()

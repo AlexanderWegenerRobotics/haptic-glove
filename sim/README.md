@@ -51,6 +51,14 @@ Every run writes to `logs/`:
 - `scene_<id>.json` scene description for the renderer
 - `run_<timestamp>.npz` per-step log (`data`, `fields`, `meta`)
 
+## Unreal stream
+
+While running, the sim streams state over UDP (`unreal:` in `sim.yaml`, `--no-unreal` to turn off). Packet layout: `protocol/unreal_udp.md`. Without Unreal, check the stream with:
+
+```
+python tools/udp_listen.py
+```
+
 ## Tools
 
 ```

@@ -7,6 +7,7 @@ import numpy as np
 
 from .hand import HandAdapter
 from .inputs import FingerSource, PoseSource
+from .outputs import UnrealPublisher
 from .recorder import Recorder
 from .scene import TARGET_BODY
 
@@ -37,11 +38,13 @@ class PhysicsLoop(threading.Thread):
     '''Runs input polling, mj_step and recording at the sim timestep in its own thread.'''
 
     def __init__(self, model: mujoco.MjModel, data: mujoco.MjData, lock: Callable[[], ContextManager], hand: HandAdapter,
-                 pose_source: PoseSource, finger_source: FingerSource, recorder: Recorder, cfg: dict):
+                 pose_source: PoseSource, finger_source: FingerSource, recorder: Recorder, cfg: dict,
+                 publisher: UnrealPublisher | None = None):
         '''Store references and look up the mocap target index; lock() must return a context manager.'''
         super().__init__(daemon=True, name="physics")
         self.model, self.data, self.lock, self.hand = model, data, lock, hand
         self.pose_source, self.finger_source, self.recorder = pose_source, finger_source, recorder
+        self.publisher = publisher
         self.realtime = cfg["simulation"]["realtime"]
         self.duration = cfg["simulation"]["duration"]
         self.mocap_id = model.body_mocapid[model.body(TARGET_BODY).id]
@@ -76,7 +79,12 @@ class PhysicsLoop(threading.Thread):
                 closure = self.hand.closure(d)
                 feedback, contact = self.hand.contact_feedback(d)
                 self.state.update(t=d.time, cmd=cmd, closure=closure, feedback=feedback)
+                packet = None
+                if self.publisher is not None and self.publisher.due(now):
+                    packet = self.publisher.capture(d, closure, feedback)
             step_time = time.perf_counter() - t0
+            if packet is not None:
+                self.publisher.send(packet)
 
             self.recorder.record(t, period, step_time, cmd, closure, feedback, contact)
             if self.duration and d.time >= self.duration:
