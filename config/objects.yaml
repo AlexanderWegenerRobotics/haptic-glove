@@ -1,0 +1,49 @@
+ball_soft:
+  shape: sphere                    # sphere | box | cylinder | capsule
+  size: [0.035]                    # MuJoCo half sizes in m
+  mass: 0.05
+  rgba: [0.85, 0.3, 0.3, 1]
+  friction: 1.0
+  contact_time: 0.015               # contact time constant in s, larger = softer, >= 2 * timestep
+  damping_ratio: 1.0
+  deformable: true                 # true | false, visual squash in Unreal
+
+ball_hard:
+  shape: sphere
+  size: [0.035]
+  mass: 0.08
+  rgba: [0.3, 0.6, 0.3, 1]
+  friction: 1.0
+  contact_time: 0.003
+  damping_ratio: 1.0
+  deformable: false
+
+block_medium:
+  shape: box
+  size: [0.025, 0.025, 0.025]
+  mass: 0.1
+  rgba: [0.9, 0.7, 0.2, 1]
+  friction: 1.0
+  contact_time: 0.008
+  damping_ratio: 1.0
+  deformable: false
+
+block_hard:
+  shape: box
+  size: [0.025, 0.025, 0.025]
+  mass: 0.1
+  rgba: [0.3, 0.4, 0.85, 1]
+  friction: 1.0
+  contact_time: 0.003
+  damping_ratio: 1.0
+  deformable: false
+
+cylinder_medium:
+  shape: cylinder
+  size: [0.025, 0.05]
+  mass: 0.12
+  rgba: [0.6, 0.4, 0.8, 1]
+  friction: 1.0
+  contact_time: 0.008
+  damping_ratio: 1.0
+  deformable: false

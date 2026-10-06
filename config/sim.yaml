@@ -1,0 +1,32 @@
+simulation:
+  timestep: 0.001
+  realtime: true
+  duration: 0                      # seconds, 0 = run until closed
+
+viewer:
+  enabled: true                    # true | false (on macOS start with mjpython)
+  fps: 60
+
+hand:
+  type: dexterous                  # dexterous | parallel_jaw
+  jaw_input: thumb_index_mean      # thumb_index_mean | index | thumb (parallel_jaw only)
+  start_pose:
+    position: [0.25, 0.0, 0.92]
+    orientation: [1, 0, 0, 0]
+  weld_solref: [0.002, 1.0]        # time constant >= 2 * timestep, smaller = stiffer wrist
+  weld_solimp: [0.99, 0.999, 0.001, 0.5, 2]
+
+input:
+  pose_source: viewer              # viewer | fixed
+  finger_source: viewer            # viewer | script
+  script:
+    period: 4.0
+    max_closure: 1.0
+
+scene: scenes/default.yaml
+objects: objects.yaml
+
+recording:
+  enabled: true
+  directory: ../logs
+  rate: 1000
