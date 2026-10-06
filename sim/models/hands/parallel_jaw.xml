@@ -1,0 +1,45 @@
+<mujoco model="parallel_jaw">
+  <compiler angle="radian" autolimits="true"/>
+
+  <default>
+    <default class="gripper">
+      <joint type="slide" damping="2" armature="0.01"/>
+      <geom type="box" density="1000" friction="1.0 0.01 0.001" condim="4" rgba="0.35 0.35 0.4 1"/>
+      <position kp="800" kv="15" ctrlrange="0 0.04"/>
+    </default>
+  </default>
+
+  <worldbody>
+    <body name="hand_root" childclass="gripper" gravcomp="1">
+      <freejoint name="hand_free"/>
+      <geom name="base" pos="0.03 0 0" size="0.03 0.055 0.018"/>
+
+      <body name="jaw_left" pos="0.06 0.045 0" gravcomp="1">
+        <joint name="jaw_left" axis="0 -1 0" range="0 0.04"/>
+        <geom name="jaw_left_link" pos="0.01 0.003 0" size="0.01 0.004 0.015"/>
+        <geom name="jaw_left_pad" pos="0.045 0 0" size="0.03 0.005 0.012" rgba="0.2 0.2 0.2 1"/>
+        <site name="jaw_left_tip" pos="0.06 -0.005 0" size="0.004" rgba="1 0 0 0.5"/>
+      </body>
+
+      <body name="jaw_right" pos="0.06 -0.045 0" gravcomp="1">
+        <joint name="jaw_right" axis="0 1 0" range="0 0.04"/>
+        <geom name="jaw_right_link" pos="0.01 -0.003 0" size="0.01 0.004 0.015"/>
+        <geom name="jaw_right_pad" pos="0.045 0 0" size="0.03 0.005 0.012" rgba="0.2 0.2 0.2 1"/>
+        <site name="jaw_right_tip" pos="0.06 0.005 0" size="0.004" rgba="1 0 0 0.5"/>
+      </body>
+    </body>
+  </worldbody>
+
+  <contact>
+    <exclude body1="hand_root" body2="jaw_left"/>
+    <exclude body1="hand_root" body2="jaw_right"/>
+  </contact>
+
+  <equality>
+    <joint joint1="jaw_right" joint2="jaw_left" polycoef="0 1 0 0 0"/>
+  </equality>
+
+  <actuator>
+    <position name="jaw" class="gripper" joint="jaw_left"/>
+  </actuator>
+</mujoco>

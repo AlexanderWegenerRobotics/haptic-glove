@@ -1,0 +1,20 @@
+<mujoco model="haptic_glove_scene">
+  <compiler angle="radian" autolimits="true"/>
+  <option timestep="0.001" integrator="implicitfast" cone="elliptic" impratio="10"/>
+
+  <visual>
+    <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0"/>
+    <global azimuth="160" elevation="-25"/>
+  </visual>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.9 0.9 0.95" rgb2="0.6 0.65 0.7" width="512" height="512"/>
+    <texture name="grid" type="2d" builtin="checker" rgb1="0.8 0.8 0.8" rgb2="0.7 0.7 0.7" width="512" height="512"/>
+    <material name="floor" texture="grid" texrepeat="8 8" reflectance="0.05"/>
+  </asset>
+
+  <worldbody>
+    <light pos="0 0 3" dir="0 0 -1" diffuse="0.7 0.7 0.7"/>
+    <geom name="floor" type="plane" size="3 3 0.1" material="floor"/>
+  </worldbody>
+</mujoco>
