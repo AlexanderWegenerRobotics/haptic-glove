@@ -27,6 +27,7 @@ Useful overrides:
 --hand parallel_jaw
 --fingers script                 # automatic open/close cycle
 --pose fixed                     # hand stays at start pose
+--pose vive --fingers trigger    # SteamVR wand or tracker (Windows)
 --headless --duration 10
 --no-record
 ```
@@ -36,9 +37,28 @@ Useful overrides:
 - Fingers (`finger_source: viewer`): Control panel sliders on the right, one per actuator.
 - Wrist (`pose_source: viewer`): double-click the green target sphere, then Ctrl + right-drag to move, Ctrl + left-drag to rotate.
 
+## Tracking (SteamVR, Windows)
+
+`pose_source: vive` reads the wand or Vive Tracker through pyopenvr as a background app, so it runs next to Unreal. SteamVR must be running. `finger_source: trigger` closes all fingers with the wand trigger. Device, polling rate, wrist offset and button mapping are under `tracking:` in `sim.yaml`.
+
+Calibration maps SteamVR space into the sim world and the way you hold the device onto the hand. Hold the hand where it should rest, palm down and fingers forward like the sim hand, look forward (or set `yaw_from: device` and point the wand forward) and run calibrate: the wrist lands on `start_pose` in position and orientation, and the forward direction becomes +x. It is saved to `config/calibration.yaml` (not in git). Redo it after moving the base station, redoing the SteamVR room setup or switching between wand and tracker.
+
+Each run starts in waiting: the sim hand holds still and a blue ghost shows the tracked hand. Bring the ghost onto the sim hand (within `engage_distance` and `engage_angle`) to engage. Tracking loss longer than `lost_timeout` releases the hand back to waiting.
+
+## Commands
+
+Type in the terminal and press Enter, or use the wand buttons (mapping in `tracking.buttons`):
+
+| Key | Default button | Command |
+|---|---|---|
+| r | menu | reset same: objects and hand back to the start, back to waiting |
+| n | grip | reset new: new random draw (new scene id), viewer reopens |
+| c | trackpad | calibrate |
+| q | | quit |
+
 ## Config
 
-- `config/sim.yaml` rates, hand type, input sources, recording
+- `config/sim.yaml` rates, hand type, input sources, tracking, session, recording
 - `config/objects.yaml` object library (shape, size, mass, contact softness)
 - `config/scenes/*.yaml` table, slots, and objects or a random sample
 
@@ -49,7 +69,7 @@ Contact softness is set by `contact_time`. MuJoCo contacts are mass-normalized, 
 Every run writes to `logs/`:
 
 - `scene_<id>.json` scene description for the renderer
-- `run_<timestamp>.npz` per-step log (`data`, `fields`, `meta`)
+- `run_<timestamp>.npz` per-step log (`data`, `fields`, `meta`), one per scene; `trial` counts resets, `mode` is 0 waiting / 1 engaged, `tracked_*` is the tracked wrist pose (NaN while not tracked)
 
 ## Unreal stream
 

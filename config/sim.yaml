@@ -17,11 +17,29 @@ hand:
   weld_solimp: [0.99, 0.999, 0.001, 0.5, 2]
 
 input:
-  pose_source: viewer              # viewer | fixed
-  finger_source: viewer            # viewer | script
+  pose_source: viewer              # viewer | fixed | vive
+  finger_source: viewer            # viewer | script | trigger
   script:
     period: 4.0
     max_closure: 1.0
+  trigger:
+    max_closure: 1.0               # closure at full trigger pull
+
+tracking:
+  device: right                    # right | left | tracker | serial number, e.g. LHR-05870E8A
+  rate: 500                        # SteamVR polling rate in Hz
+  yaw_from: hmd                    # hmd | device, forward at calibrate: headset view or wand pointing direction
+  calibration: calibration.yaml    # written by calibrate (alignment + grip), redo after moving the base station or changing the device
+  wrist_offset: [0.0, -0.03, 0.1]  # hand root position in the device frame, m
+  buttons:                         # menu | grip | trackpad | none
+    reset_same: menu
+    reset_new: grip
+    calibrate: trackpad
+
+session:
+  engage_distance: 0.03            # m between tracked and sim hand to engage
+  engage_angle: 20                 # deg between tracked and sim hand to engage
+  lost_timeout: 0.2                # s of tracking loss before the hand is released
 
 unreal:
   enabled: true                    # true | false

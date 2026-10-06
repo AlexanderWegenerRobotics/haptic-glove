@@ -73,6 +73,7 @@ def load_sim_config(path: str | Path | None = None) -> dict:
     cfg["scene"] = str((base / cfg["scene"]).resolve())
     cfg["objects"] = str((base / cfg["objects"]).resolve())
     cfg["recording"]["directory"] = str((base / cfg["recording"]["directory"]).resolve())
+    cfg["tracking"]["calibration"] = str((base / cfg["tracking"]["calibration"]).resolve())
     return cfg
 
 
@@ -81,8 +82,8 @@ def load_object_library(path: str | Path) -> dict:
     return {name: ObjectType(name=name, **params) for name, params in load_yaml(Path(path)).items()}
 
 
-def load_scene(path: str | Path, library: dict) -> SceneSpec:
-    '''Resolve a scene file into concrete object instances placed on table slots.'''
+def load_scene(path: str | Path, library: dict, reseed: bool = False) -> SceneSpec:
+    '''Resolve a scene file into concrete object instances placed on table slots; reseed forces a new random draw.'''
     path = Path(path)
     raw = load_yaml(path)
     table = TableSpec(**raw["table"])
@@ -92,7 +93,7 @@ def load_scene(path: str | Path, library: dict) -> SceneSpec:
     if "sample" in raw:
         sample = raw["sample"]
         seed = sample.get("seed")
-        if seed is None:
+        if seed is None or reseed:
             seed = random.randrange(2**31)
         rng = random.Random(seed)
         pool, count = sample["from"], sample["count"]

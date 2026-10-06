@@ -4,7 +4,6 @@ import threading
 import time
 
 import mujoco
-import numpy as np
 
 from .config import CONFIG_DIR, load_object_library, load_scene, load_sim_config
 from .hand import make_hand
@@ -13,6 +12,8 @@ from .loop import PhysicsLoop
 from .outputs import UnrealPublisher
 from .recorder import Recorder, timing_summary
 from .scene import build_model, describe_scene, write_scene_description
+from .session import CommandQueue, Session, start_terminal_commands
+from .tracking import make_tracking
 
 
 def parse_args(argv=None) -> argparse.Namespace:
@@ -21,8 +22,8 @@ def parse_args(argv=None) -> argparse.Namespace:
     p.add_argument("--config", default=str(CONFIG_DIR / "sim.yaml"))
     p.add_argument("--scene", help="scene file, relative to config/ or absolute")
     p.add_argument("--hand", choices=["dexterous", "parallel_jaw"])
-    p.add_argument("--fingers", choices=["viewer", "script"])
-    p.add_argument("--pose", choices=["viewer", "fixed"])
+    p.add_argument("--fingers", choices=["viewer", "script", "trigger"])
+    p.add_argument("--pose", choices=["viewer", "fixed", "vive"])
     p.add_argument("--headless", action="store_true")
     p.add_argument("--duration", type=float)
     p.add_argument("--no-record", action="store_true")
@@ -91,19 +92,17 @@ def wait_headless(loop: PhysicsLoop, stop: threading.Event) -> None:
         pass
 
 
-def main(argv=None) -> None:
-    '''Build the scene, start the physics thread and run the viewer or wait headless.'''
-    args = parse_args(argv)
-    cfg = apply_overrides(load_sim_config(args.config), args)
-
-    library = load_object_library(cfg["objects"])
-    scene = load_scene(cfg["scene"], library)
+def run_episode(cfg: dict, library: dict, commands: CommandQueue, stop: threading.Event, tracking,
+                reseed: bool) -> str:
+    '''Build one scene, run physics with the viewer or headless until it ends, save the log and return why it ended.'''
+    scene = load_scene(cfg["scene"], library, reseed)
     model = build_model(cfg, scene)
     data = mujoco.MjData(model)
     mujoco.mj_forward(model, data)
 
     hand = make_hand(model, cfg)
     description = describe_scene(scene, cfg)
+    description["tracking"] = tracking.calibration.as_dict() if tracking else None
     publisher = UnrealPublisher(model, hand, description, cfg) if cfg["unreal"]["enabled"] else None
     scene_path = write_scene_description(description, cfg["recording"]["directory"])
     print(f"scene '{scene.name}' id {description['scene_id']} seed {scene.seed} hand {cfg['hand']['type']}")
@@ -115,16 +114,16 @@ def main(argv=None) -> None:
         publisher.start()
 
     recorder = Recorder(cfg["recording"]["directory"], cfg["recording"]["enabled"])
+    pose_source = make_pose_source(cfg, tracking)
+    session = Session(cfg, pose_source.tracked)
 
     def start_loop(lock) -> PhysicsLoop:
         '''Create and start the physics thread with the given lock factory.'''
-        loop = PhysicsLoop(model, data, lock, hand, make_pose_source(cfg), make_finger_source(cfg), recorder, cfg,
-                           publisher)
+        loop = PhysicsLoop(model, data, lock, hand, pose_source, make_finger_source(cfg, tracking), recorder, cfg,
+                           session, commands, publisher, tracking)
         loop.start()
         return loop
 
-    stop = threading.Event()
-    install_stop_handler(stop)
     if cfg["viewer"]["enabled"]:
         loop = run_viewer(model, data, cfg, start_loop, stop)
     else:
@@ -135,7 +134,7 @@ def main(argv=None) -> None:
         loop.join(timeout=2.0)
     if publisher:
         publisher.stop()
-    print("stopped")
+    print(f"stopped ({loop.exit_reason})")
 
     rows = recorder.data()
     if len(rows):
@@ -143,3 +142,24 @@ def main(argv=None) -> None:
     log_path = recorder.save({"config": cfg, "scene": description})
     if log_path:
         print(f"log: {log_path}")
+    return loop.exit_reason
+
+
+def main(argv=None) -> None:
+    '''Start tracking and command inputs, then run scenes until stopped; reset_new rebuilds with a new draw.'''
+    args = parse_args(argv)
+    cfg = apply_overrides(load_sim_config(args.config), args)
+    library = load_object_library(cfg["objects"])
+
+    commands = CommandQueue()
+    start_terminal_commands(commands)
+    tracking = make_tracking(cfg, commands.put)
+    stop = threading.Event()
+    install_stop_handler(stop)
+    try:
+        reseed = False
+        while run_episode(cfg, library, commands, stop, tracking, reseed) == "reset_new" and not stop.is_set():
+            reseed = True
+    finally:
+        if tracking:
+            tracking.stop()

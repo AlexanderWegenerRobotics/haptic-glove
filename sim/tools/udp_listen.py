@@ -62,7 +62,8 @@ def main() -> None:
                     lat = np.array(latencies) * 1e3
                     print(f"{count / (now - window):6.1f} Hz  lost {lost}  latency mean {lat.mean():.2f} ms  "
                           f"max {lat.max():.2f} ms  sim t {last['sim_time']:.2f}  "
-                          f"closure {np.round(last['closure'], 2)}  feedback {np.round(last['feedback'], 2)}")
+                          f"closure {np.round(last['closure'], 2)}  feedback {np.round(last['feedback'], 2)}  "
+                          f"{'engaged' if last['engaged'] else 'waiting'}{'  ghost' if last['ghost_visible'] else ''}")
                     if args.verbose:
                         print(last)
                 count, lost, latencies, window = 0, 0, [], now

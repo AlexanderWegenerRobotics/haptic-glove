@@ -8,12 +8,14 @@ import mujoco
 import numpy as np
 
 from .hand import HandAdapter
-from .scene import HAND_PREFIX
+from .scene import GHOST_BODY, HAND_PREFIX
 
-PROTOCOL_VERSION = 1
+PROTOCOL_VERSION = 2
 STATE_MAGIC = b"HGST"
 SCENE_MAGIC = b"HGSC"
 HAND_TYPES = {"dexterous": 0, "parallel_jaw": 1}
+FLAG_ENGAGED = 1
+FLAG_GHOST = 2
 HEADER = struct.Struct("<4sHBBIdd8s")
 POSE = struct.Struct("<7f")
 COUNT = struct.Struct("<H")
@@ -37,6 +39,7 @@ class UnrealPublisher:
         self.next_send = 0.0
 
         self.root_body = model.body(HAND_PREFIX + "hand_root").id
+        self.ghost_body = model.body(GHOST_BODY).id
         self.object_ids = [o["id"] for o in description["objects"]]
         self.object_bodies = np.array([model.body(i).id for i in self.object_ids], dtype=int)
         self.object_geoms = {model.geom(i).id: k for k, i in enumerate(self.object_ids)}
@@ -47,6 +50,7 @@ class UnrealPublisher:
         description["hand_joints"] = list(hand.joint_names)
         description["stream"] = {"host": ucfg["host"], "state_port": ucfg["state_port"],
                                  "scene_port": ucfg["scene_port"], "rate": ucfg["rate"]}
+        self.description = description
         self.scene_packet = SCENE_MAGIC + json.dumps(description).encode()
         self.stop_event = threading.Event()
         self.scene_thread = threading.Thread(target=self._scene_loop, daemon=True, name="unreal_scene")
@@ -61,6 +65,11 @@ class UnrealPublisher:
         self.scene_thread.join(timeout=1.0)
         self.sock.close()
 
+    def set_tracking(self, tracking: dict) -> None:
+        '''Update the tracking calibration in the repeated scene message after a recalibration.'''
+        self.description["tracking"] = tracking
+        self.scene_packet = SCENE_MAGIC + json.dumps(self.description).encode()
+
     def _scene_loop(self) -> None:
         '''Send the scene description every scene_interval seconds.'''
         while not self.stop_event.is_set():
@@ -74,12 +83,15 @@ class UnrealPublisher:
         self.next_send = max(self.next_send + self.period, now)
         return True
 
-    def capture(self, data: mujoco.MjData, closure: np.ndarray, feedback: np.ndarray) -> bytes:
+    def capture(self, data: mujoco.MjData, closure: np.ndarray, feedback: np.ndarray, engaged: bool,
+                ghost_visible: bool) -> bytes:
         '''Pack the current state into one packet; call while holding the sim lock.'''
         self.seq += 1
-        parts = [HEADER.pack(STATE_MAGIC, PROTOCOL_VERSION, self.hand_type, 0, self.seq, data.time,
+        flags = FLAG_ENGAGED * engaged | FLAG_GHOST * ghost_visible
+        parts = [HEADER.pack(STATE_MAGIC, PROTOCOL_VERSION, self.hand_type, flags, self.seq, data.time,
                              time.time(), self.scene_id),
-                 POSE.pack(*data.xpos[self.root_body], *data.xquat[self.root_body])]
+                 POSE.pack(*data.xpos[self.root_body], *data.xquat[self.root_body]),
+                 POSE.pack(*data.xpos[self.ghost_body], *data.xquat[self.ghost_body])]
         joints = data.qpos[self.hand.joint_qpos]
         parts.append(COUNT.pack(len(joints)))
         parts.append(struct.pack(f"<{len(joints)}f", *joints))
@@ -118,11 +130,13 @@ class UnrealPublisher:
 
 def decode_state(packet: bytes) -> dict:
     '''Decode a state packet; reference implementation for the Unreal side.'''
-    magic, version, hand_type, _, seq, sim_time, send_time, scene_id = HEADER.unpack_from(packet, 0)
+    magic, version, hand_type, flags, seq, sim_time, send_time, scene_id = HEADER.unpack_from(packet, 0)
     if magic != STATE_MAGIC:
         raise ValueError("not a state packet")
     off = HEADER.size
     pose = POSE.unpack_from(packet, off)
+    off += POSE.size
+    ghost = POSE.unpack_from(packet, off)
     off += POSE.size
     (nj,) = COUNT.unpack_from(packet, off)
     off += COUNT.size
@@ -137,6 +151,8 @@ def decode_state(packet: bytes) -> dict:
         v = OBJECT.unpack_from(packet, off)
         off += OBJECT.size
         objects.append({"position": v[0:3], "quaternion": v[3:7], "squash_depth": v[7], "squash_dir": v[8:11]})
-    return {"version": version, "hand_type": hand_type, "seq": seq, "sim_time": sim_time, "send_time": send_time,
+    return {"version": version, "hand_type": hand_type, "engaged": bool(flags & FLAG_ENGAGED),
+            "ghost_visible": bool(flags & FLAG_GHOST), "seq": seq, "sim_time": sim_time, "send_time": send_time,
             "scene_id": scene_id.rstrip(b"\0").decode(), "wrist_position": pose[0:3], "wrist_quaternion": pose[3:7],
+            "ghost_position": ghost[0:3], "ghost_quaternion": ghost[3:7],
             "joints": joints, "closure": ch[0:3], "feedback": ch[3:6], "objects": objects}

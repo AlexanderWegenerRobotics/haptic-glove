@@ -20,6 +20,7 @@ firmware/sdkconfig.old
 firmware/dependencies.lock
 
 MUJOCO_LOG.TXT
+config/calibration.yaml
 logs/
 *.log
 *.csv
@@ -33,4 +34,4 @@ logs/
 ~$*
 
 .env
-secrets.h
+secrets.h

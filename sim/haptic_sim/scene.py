@@ -9,6 +9,9 @@ from .config import HAND_MODELS, MODEL_DIR, SceneSpec
 
 HAND_PREFIX = "hand/"
 TARGET_BODY = "hand_target"
+GHOST_BODY = "hand_ghost"
+GHOST_RGBA = [0.3, 0.55, 1.0, 0.35]
+GHOST_GEOMS = {"palm": ([0.045, 0.04, 0.012], [0.045, 0, 0]), "fingers": ([0.035, 0.035, 0.008], [0.125, 0, 0])}
 SHAPES = {
     "sphere": mujoco.mjtGeom.mjGEOM_SPHERE,
     "box": mujoco.mjtGeom.mjGEOM_BOX,
@@ -47,7 +50,7 @@ def _add_objects(spec: mujoco.MjSpec, scene: SceneSpec) -> None:
 
 
 def _add_hand(spec: mujoco.MjSpec, cfg: dict) -> None:
-    '''Attach the selected hand model and weld it softly to a mocap target body.'''
+    '''Attach the selected hand model, weld it softly to a mocap target body and add the hidden ghost hand.'''
     hand_cfg = cfg["hand"]
     pos = hand_cfg["start_pose"]["position"]
     quat = hand_cfg["start_pose"]["orientation"]
@@ -55,6 +58,11 @@ def _add_hand(spec: mujoco.MjSpec, cfg: dict) -> None:
     target = spec.worldbody.add_body(name=TARGET_BODY, mocap=True, pos=pos, quat=quat)
     target.add_geom(type=mujoco.mjtGeom.mjGEOM_SPHERE, size=[0.018, 0, 0], pos=[-0.035, 0, 0],
                     rgba=[0.2, 0.8, 0.2, 0.5], contype=0, conaffinity=0)
+
+    ghost = spec.worldbody.add_body(name=GHOST_BODY, mocap=True, pos=pos, quat=quat)
+    for name, (size, gpos) in GHOST_GEOMS.items():
+        ghost.add_geom(name=f"ghost_{name}", type=mujoco.mjtGeom.mjGEOM_BOX, size=size, pos=gpos,
+                       rgba=GHOST_RGBA[:3] + [0.0], contype=0, conaffinity=0)
 
     hand_spec = mujoco.MjSpec.from_file(str(MODEL_DIR / HAND_MODELS[hand_cfg["type"]]))
     frame = spec.worldbody.add_frame(pos=pos, quat=quat)

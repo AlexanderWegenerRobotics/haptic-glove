@@ -6,6 +6,8 @@ from .hand import CHANNELS
 class PoseSource:
     '''Provides the wrist target pose; None means the mocap body is left alone (viewer dragging).'''
 
+    tracked = False
+
     def read(self, t: float):
         '''Return (position, quaternion wxyz) or None.'''
         return None
@@ -22,6 +24,20 @@ class FixedPose(PoseSource):
     def read(self, t):
         '''Always return the start pose.'''
         return self.pose
+
+
+class VivePose(PoseSource):
+    '''Wrist pose of the SteamVR device in the calibrated world frame; engagement is handled by the session.'''
+
+    tracked = True
+
+    def __init__(self, tracking):
+        '''Keep the tracking system.'''
+        self.tracking = tracking
+
+    def read(self, t):
+        '''Return the latest tracked wrist pose or None while not tracked.'''
+        return self.tracking.wrist_pose()
 
 
 class FingerSource:
@@ -47,21 +63,38 @@ class ScriptFingers(FingerSource):
         return np.full(len(CHANNELS), c)
 
 
-def make_pose_source(cfg: dict) -> PoseSource:
+class TriggerFingers(FingerSource):
+    '''Wand trigger closes all channels together, stand-in until the glove exists.'''
+
+    def __init__(self, cfg: dict, tracking):
+        '''Keep the tracking system and the closure at full trigger.'''
+        self.tracking = tracking
+        self.max_closure = cfg["input"]["trigger"]["max_closure"]
+
+    def read(self, t):
+        '''Scale the trigger value to the same closure on every channel.'''
+        return np.full(len(CHANNELS), self.max_closure * self.tracking.trigger())
+
+
+def make_pose_source(cfg: dict, tracking=None) -> PoseSource:
     '''Create the configured wrist pose source.'''
     name = cfg["input"]["pose_source"]
     if name == "viewer":
         return PoseSource()
     if name == "fixed":
         return FixedPose(cfg)
+    if name == "vive":
+        return VivePose(tracking)
     raise ValueError(f"unknown pose_source '{name}'")
 
 
-def make_finger_source(cfg: dict) -> FingerSource:
+def make_finger_source(cfg: dict, tracking=None) -> FingerSource:
     '''Create the configured finger command source.'''
     name = cfg["input"]["finger_source"]
     if name == "viewer":
         return FingerSource()
     if name == "script":
         return ScriptFingers(cfg)
+    if name == "trigger":
+        return TriggerFingers(cfg, tracking)
     raise ValueError(f"unknown finger_source '{name}'")
