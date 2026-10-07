@@ -104,10 +104,10 @@ def describe_scene(scene: SceneSpec, cfg: dict) -> dict:
     }
 
 
-def write_scene_description(description: dict, directory: str | Path) -> Path:
-    '''Write the scene description as json next to the logs and return its path.'''
+def write_scene_description(description: dict, directory: str | Path, stem: str) -> Path:
+    '''Write the scene description as <stem>.json next to the scene log and return its path.'''
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
-    path = directory / f"scene_{description['scene_id']}.json"
+    path = directory / f"{stem}.json"
     path.write_text(json.dumps(description, indent=2))
     return path

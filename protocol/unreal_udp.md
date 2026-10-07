@@ -38,8 +38,11 @@ hand_geoms [{body (index into hand_bodies), type, size, position, orientation, r
 table {position (center of the top plate), size [x, y, thickness], height, rgba},
 objects [{id, type, shape, size, rgba, deformable, position, orientation}],
 stream {host, state_port, scene_port, rate},
-tracking {yaw (rad), position [x, y, z], grip [w, x, y, z], created} or null
+tracking {yaw (rad), position [x, y, z], grip [w, x, y, z], created} or null,
+session {id, directory}
 ```
+
+`session` names the sim session (one per sim start) and its log folder. Unreal records its videos into that folder, or into `Saved/Sessions/<id>` when the field is empty, and starts a new recording when `id` changes.
 
 Geom types are `sphere | capsule | ellipsoid | cylinder | box` with MuJoCo sizes: sphere `[r]`, capsule and cylinder `[r, half_length]` along local z, ellipsoid and box half sizes `[x, y, z]`. Hand geom `position`/`orientation` are relative to their body. Object order in `objects` is the order used in the state packet.
 

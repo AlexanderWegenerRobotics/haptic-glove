@@ -230,5 +230,12 @@ bool SimProtocol::ParseScene(const uint8* Data, int32 Size, FSimScene& Out)
 		Out.Tracking.Position = ReadPosition(T->GetArrayField(TEXT("position")));
 		T->TryGetStringField(TEXT("created"), Out.Tracking.Created);
 	}
+
+	const TSharedPtr<FJsonObject>* Session = nullptr;
+	if (Root->TryGetObjectField(TEXT("session"), Session) && Session && Session->IsValid())
+	{
+		(*Session)->TryGetStringField(TEXT("id"), Out.SessionId);
+		(*Session)->TryGetStringField(TEXT("directory"), Out.SessionDirectory);
+	}
 	return true;
 }

@@ -10,7 +10,7 @@ from .hand import make_hand
 from .inputs import make_finger_source, make_pose_source
 from .loop import PhysicsLoop
 from .outputs import UnrealPublisher
-from .recorder import Recorder, timing_summary
+from .recorder import Recorder, SessionLog, timing_summary
 from .scene import build_model, describe_scene, write_scene_description
 from .session import CommandQueue, Session, start_terminal_commands, start_udp_commands
 from .tracking import make_tracking
@@ -93,7 +93,7 @@ def wait_headless(loop: PhysicsLoop, stop: threading.Event) -> None:
 
 
 def run_episode(cfg: dict, library: dict, commands: CommandQueue, session: Session, stop: threading.Event, tracking,
-                reseed: bool) -> tuple[str, dict]:
+                reseed: bool, session_log: SessionLog) -> tuple[str, dict]:
     '''Build one scene, run physics with the viewer or headless until it ends, save the log and return why it ended.'''
     scene = load_scene(cfg["scene"], library, reseed)
     model = build_model(cfg, scene)
@@ -103,8 +103,10 @@ def run_episode(cfg: dict, library: dict, commands: CommandQueue, session: Sessi
     hand = make_hand(model, cfg)
     description = describe_scene(scene, cfg)
     description["tracking"] = tracking.calibration.as_dict() if tracking else None
+    description["session"] = session_log.as_dict()
+    stem = session_log.next_stem(description["scene_id"])
     publisher = UnrealPublisher(model, hand, description, cfg) if cfg["unreal"]["enabled"] else None
-    scene_path = write_scene_description(description, cfg["recording"]["directory"])
+    scene_path = write_scene_description(description, session_log.directory, stem)
     print(f"scene '{scene.name}' id {description['scene_id']} seed {scene.seed} hand {cfg['hand']['type']}")
     print(f"objects: {', '.join(o.id for o in scene.objects)}")
     print(f"scene description: {scene_path}")
@@ -113,7 +115,7 @@ def run_episode(cfg: dict, library: dict, commands: CommandQueue, session: Sessi
         print(f"unreal stream: {u['host']}:{u['state_port']} at {u['rate']} Hz, scene on :{u['scene_port']}")
         publisher.start()
 
-    recorder = Recorder(cfg["recording"]["directory"], cfg["recording"]["enabled"])
+    recorder = Recorder(session_log.directory, cfg["recording"]["enabled"])
     pose_source = make_pose_source(cfg, tracking)
     session.reset()
 
@@ -139,7 +141,8 @@ def run_episode(cfg: dict, library: dict, commands: CommandQueue, session: Sessi
     rows = recorder.data()
     if len(rows):
         print(timing_summary(rows[:, 1], rows[:, 2], model.opt.timestep))
-    log_path = recorder.save({"config": cfg, "scene": description})
+    log_path = recorder.save({"config": cfg, "scene": description}, stem)
+    session_log.add_scene(stem, description["scene_id"], rows)
     if log_path:
         print(f"log: {log_path}")
     return loop.exit_reason, loop.exit_args
@@ -157,12 +160,15 @@ def main(argv=None) -> None:
         start_udp_commands(commands, cfg)
     tracking = make_tracking(cfg, commands.put)
     session = Session(cfg, cfg["input"]["pose_source"] == "vive")
+    session_log = SessionLog(cfg["recording"]["directory"], cfg, cfg["recording"]["enabled"])
+    print(f"session {session_log.id}: {session_log.directory}")
     stop = threading.Event()
     install_stop_handler(stop)
     try:
         reseed = False
         while not stop.is_set():
-            reason, args = run_episode(cfg, library, commands, session, stop, tracking, reseed)
+            reason, args = run_episode(cfg, library, commands, session, stop, tracking, reseed, session_log)
+            session.trial += 1
             if reason == "reset_new":
                 reseed = True
             elif reason == "set_hand":

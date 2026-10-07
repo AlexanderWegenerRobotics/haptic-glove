@@ -28,6 +28,10 @@
 		{
 			"Name": "OpenXR",
 			"Enabled": true
+		},
+		{
+			"Name": "AudioCapture",
+			"Enabled": true
 		}
 	]
 }

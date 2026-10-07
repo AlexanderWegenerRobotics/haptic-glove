@@ -27,6 +27,7 @@ rendering/**/DerivedDataCache/
 rendering/**/.vs/
 rendering/**/*.sln
 rendering/**/*.vsconfig
+rendering/**/ThirdParty/ffmpeg/
 config/calibration.yaml
 logs/
 *.log

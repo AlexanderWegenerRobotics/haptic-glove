@@ -10,7 +10,7 @@ FIELDS = ["t", "period", "step_time"] + [
     f"{kind}_{c}" for kind in ("cmd", "closure", "feedback", "contact") for c in CHANNELS
 ] + ["trial", "mode"] + [f"tracked_{k}" for k in ("x", "y", "z", "qw", "qx", "qy", "qz")] + [
     f"glove_{kind}_{c}" for kind in ("sent", "torque") for c in CHANNELS
-] + ["glove_rtt", "glove_flags"]
+] + ["glove_rtt", "glove_flags", "wall"]
 
 
 class Recorder:
@@ -40,20 +40,64 @@ class Recorder:
         else:
             buf[17:20], buf[20:24] = tracked
         buf[24:32] = np.nan if glove is None else glove
+        buf[32] = time.time()
         self.n += 1
 
     def data(self) -> np.ndarray:
         '''Return all recorded rows as one array.'''
         return np.concatenate(self.chunks)[: self.n]
 
-    def save(self, meta: dict) -> Path | None:
-        '''Write the rows plus metadata to logs/run_<timestamp>.npz.'''
+    def save(self, meta: dict, stem: str) -> Path | None:
+        '''Write the rows plus metadata to <directory>/<stem>.npz.'''
         if not self.enabled or self.n == 0:
             return None
         self.directory.mkdir(parents=True, exist_ok=True)
-        path = self.directory / f"run_{time.strftime('%Y%m%d_%H%M%S')}.npz"
+        path = self.directory / f"{stem}.npz"
         np.savez_compressed(path, data=self.data(), fields=np.array(FIELDS), meta=json.dumps(meta))
         return path
+
+
+class SessionLog:
+    '''One folder per sim session: scene logs, scene descriptions and session.json with the trial table.'''
+
+    def __init__(self, root: str, cfg: dict, enabled: bool = True):
+        '''Name the session after its start time and write the initial session.json.'''
+        self.id = time.strftime("%Y%m%d_%H%M%S")
+        self.directory = Path(root) / self.id
+        self.enabled = enabled
+        self.info = {"session_id": self.id, "created": time.strftime("%Y-%m-%dT%H:%M:%S"), "start_unix": time.time(),
+                     "config": cfg, "scenes": [], "trials": []}
+        self.scene_count = 0
+        self._write()
+
+    def as_dict(self) -> dict:
+        '''Session id and folder for the scene message, so the renderer logs into the same folder.'''
+        return {"id": self.id, "directory": str(self.directory)}
+
+    def next_stem(self, scene_id: str) -> str:
+        '''File stem for the next scene, numbered in session order.'''
+        self.scene_count += 1
+        return f"scene_{self.scene_count:02d}_{scene_id}"
+
+    def add_scene(self, stem: str, scene_id: str, rows: np.ndarray) -> None:
+        '''Append the scene and the trials it contained, with wall clock start and end per trial.'''
+        if not self.enabled or not len(rows):
+            return
+        trial, wall = rows[:, FIELDS.index("trial")], rows[:, FIELDS.index("wall")]
+        self.info["scenes"].append({"stem": stem, "scene_id": scene_id, "start_unix": float(wall[0]),
+                                    "end_unix": float(wall[-1])})
+        for number in dict.fromkeys(trial.astype(int).tolist()):
+            sel = wall[trial == number]
+            self.info["trials"].append({"trial": number, "scene": stem, "scene_id": scene_id,
+                                        "start_unix": float(sel[0]), "end_unix": float(sel[-1])})
+        self._write()
+
+    def _write(self) -> None:
+        '''Rewrite session.json.'''
+        if not self.enabled:
+            return
+        self.directory.mkdir(parents=True, exist_ok=True)
+        (self.directory / "session.json").write_text(json.dumps(self.info, indent=2))
 
 
 def timing_summary(periods: np.ndarray, step_times: np.ndarray, target: float) -> str:

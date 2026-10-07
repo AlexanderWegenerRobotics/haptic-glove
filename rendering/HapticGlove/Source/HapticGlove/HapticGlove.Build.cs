@@ -12,7 +12,8 @@ public class HapticGlove : ModuleRules
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] {
-			"Sockets", "Networking", "Json", "JsonUtilities",
+			"Sockets", "Networking", "Json", "JsonUtilities", "RHI", "RenderCore",
+			"AudioMixer", "AudioMixerCore", "AudioCaptureCore", "AudioCapture",
 		});
 	}
 }

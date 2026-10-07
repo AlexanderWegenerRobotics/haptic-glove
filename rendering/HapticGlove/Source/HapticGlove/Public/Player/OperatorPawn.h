@@ -8,6 +8,7 @@
 class UBodyAnchorComponent;
 class UCameraComponent;
 class UGazeInteractionComponent;
+class ULogCameraComponent;
 class USimLinkSubsystem;
 
 UCLASS()
@@ -33,6 +34,9 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Operator")
 	TObjectPtr<UBodyAnchorComponent> Tray;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Operator")
+	TObjectPtr<ULogCameraComponent> OperatorView;
 
 	/** Place the VR origin so the headset and the streamed hand share the sim calibration. */
 	UFUNCTION(BlueprintCallable, Category = "Operator")

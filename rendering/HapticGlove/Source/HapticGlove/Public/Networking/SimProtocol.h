@@ -73,6 +73,8 @@ struct FSimScene
 	UPROPERTY(BlueprintReadOnly) FSimTable Table;
 	UPROPERTY(BlueprintReadOnly) TArray<FSimObject> Objects;
 	UPROPERTY(BlueprintReadOnly) FSimTracking Tracking;
+	UPROPERTY(BlueprintReadOnly) FString SessionId;
+	UPROPERTY(BlueprintReadOnly) FString SessionDirectory;
 };
 
 USTRUCT(BlueprintType)

@@ -13,10 +13,10 @@ from haptic_sim.hand import CHANNELS
 
 
 def latest_log(directory: Path) -> Path:
-    '''Return the newest run log in the log folder.'''
-    logs = sorted(directory.glob("run_*.npz"))
+    '''Return the newest scene log in any session folder, or an old flat run log.'''
+    logs = sorted([*directory.glob("*/scene_*.npz"), *directory.glob("run_*.npz")], key=lambda p: p.stat().st_mtime)
     if not logs:
-        raise FileNotFoundError(f"no run_*.npz in {directory}")
+        raise FileNotFoundError(f"no scene_*.npz in {directory}")
     return logs[-1]
 
 
@@ -85,7 +85,7 @@ def plot(cols: dict, meta: dict, title: str):
 def main() -> None:
     '''Plot a run log, the newest one by default.'''
     p = argparse.ArgumentParser()
-    p.add_argument("log", nargs="?", help="path to run_*.npz, default newest in logs/")
+    p.add_argument("log", nargs="?", help="path to a scene_*.npz, default newest in logs/<session>/")
     p.add_argument("--out", help="save to this image instead of opening a window")
     args = p.parse_args()
 

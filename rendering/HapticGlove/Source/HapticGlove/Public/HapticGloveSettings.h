@@ -52,6 +52,42 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category = "Sound", meta = (ClampMin = "0.0"))
 	float OutageWarningDelay = 3.0f;
 
+	UPROPERTY(Config, EditAnywhere, Category = "Recording")
+	bool bRecordSessions = true;
+
+	UPROPERTY(Config, EditAnywhere, Category = "Recording", meta = (ClampMin = "1", ClampMax = "90"))
+	int32 VideoFps = 30;
+
+	UPROPERTY(Config, EditAnywhere, Category = "Recording")
+	bool bRecordMicrophone = true;
+
+	UPROPERTY(Config, EditAnywhere, Category = "Recording")
+	FString MicrophoneName;
+
+	UPROPERTY(Config, EditAnywhere, Category = "Recording")
+	bool bEnhanceSpeech = true;
+
+	UPROPERTY(Config, EditAnywhere, Category = "Recording", meta = (ClampMin = "-70.0", ClampMax = "-10.0"))
+	float NoiseGateThresholdDb = -38.0f;
+
+	UPROPERTY(Config, EditAnywhere, Category = "Recording", meta = (ClampMin = "20.0", ClampMax = "2000.0"))
+	float NoiseGateReleaseMs = 200.0f;
+
+	UPROPERTY(Config, EditAnywhere, Category = "Recording", meta = (ClampMin = "-20.0", ClampMax = "30.0"))
+	float MicGainDb = 0.0f;
+
+	UPROPERTY(Config, EditAnywhere, Category = "Recording", meta = (ClampMin = "-20.0", ClampMax = "30.0"))
+	float GameAudioGainDb = 0.0f;
+
+	UPROPERTY(Config, EditAnywhere, Category = "Recording")
+	bool bKeepIntermediates = false;
+
+	UPROPERTY(Config, EditAnywhere, Category = "Recording", meta = (ClampMin = "1.0"))
+	float SessionEndTimeout = 20.0f;
+
+	UPROPERTY(Config, EditAnywhere, Category = "Recording")
+	FString FfmpegPath;
+
 	UPROPERTY(Config, EditAnywhere, Category = "Sound")
 	bool bUiSounds = true;
 

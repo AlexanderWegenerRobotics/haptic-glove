@@ -72,10 +72,12 @@ Contact softness is set by `contact_time`. MuJoCo contacts are mass-normalized, 
 
 ## Outputs
 
-Every run writes to `logs/`:
+Every start of the sim is one session with its own folder `logs/<YYYYmmdd_HHMMSS>/`:
 
-- `scene_<id>.json` scene description for the renderer
-- `run_<timestamp>.npz` per-step log (`data`, `fields`, `meta`), one per scene; `trial` counts resets, `mode` is 0 waiting / 1 engaged, `tracked_*` is the tracked wrist pose (NaN while not tracked)
+- `session.json` config, scene list and the trial table (trial number, scene, wall clock start and end), rewritten after every scene
+- `scene_<nn>_<id>.json` scene description for the renderer
+- `scene_<nn>_<id>.npz` per-step log (`data`, `fields`, `meta`), one per scene; `trial` counts resets across the whole session (a new scene or hand also starts a new trial), `mode` is 0 waiting / 1 engaged, `tracked_*` is the tracked wrist pose (NaN while not tracked), `wall` is Unix time
+- `video_<stream>.mp4` and `video_<stream>.json` from Unreal: the operator view with game audio and microphone, one chapter per trial; the json maps frames to Unix time, trial and sim time
 
 ## Unreal stream
 

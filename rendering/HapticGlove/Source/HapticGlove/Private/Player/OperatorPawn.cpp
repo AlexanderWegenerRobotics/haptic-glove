@@ -8,6 +8,7 @@
 #include "IXRTrackingSystem.h"
 #include "InputCoreTypes.h"
 #include "Networking/SimLinkSubsystem.h"
+#include "Recording/LogCameraComponent.h"
 #include "UI/BodyAnchorComponent.h"
 #include "UI/GazeInteractionComponent.h"
 #include "UI/SimWidgets.h"
@@ -29,6 +30,10 @@ AOperatorPawn::AOperatorPawn()
 
 	Tray = CreateDefaultSubobject<UBodyAnchorComponent>(TEXT("Tray"));
 	Tray->SetupAttachment(VROrigin);
+
+	OperatorView = CreateDefaultSubobject<ULogCameraComponent>(TEXT("OperatorView"));
+	OperatorView->SetupAttachment(Camera);
+	OperatorView->StreamName = TEXT("operator");
 }
 
 void AOperatorPawn::BeginPlay()
