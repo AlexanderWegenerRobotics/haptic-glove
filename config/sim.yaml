@@ -18,7 +18,7 @@ hand:
 
 input:
   pose_source: viewer              # viewer | fixed | vive
-  finger_source: viewer            # viewer | script | trigger
+  finger_source: viewer            # viewer | script | trigger | glove
   script:
     period: 4.0
     max_closure: 1.0
@@ -41,6 +41,18 @@ session:
   engage_angle: 20                 # deg between tracked and sim hand to engage
   lost_timeout: 0.2                # s of tracking loss before the hand is released
 
+glove:
+  transport: serial                # serial | udp (udp talks to tools/fake_glove.py)
+  port: COM4                       # serial port, e.g. COM4 or /dev/cu.usbmodem101
+  baud: 921600                     # UART bridge port, ignored on native USB
+  udp_port: 9880                   # sim listens here for the fake glove
+  torque_scale: 0.1                # servo Nm per unit of sim feedback (sim fingers 2 Nm max, XL330 ~0.2 Nm)
+  torque_limit: 0.2                # Nm, upper bound sent to the glove
+  filter_hz: 15                    # Hz, low-pass on sim feedback before sending, 0 = off
+  damping: 0.0                     # Nm s per unit closure, glove-side damping on closing speed while in contact
+  slew_rate: 10                    # Nm/s, glove-side torque rate limit, 0 = off
+  timeout: 0.05                    # s without glove state before the viewer sliders take over
+
 unreal:
   enabled: true                    # true | false
   host: 127.0.0.1
@@ -48,6 +60,8 @@ unreal:
   scene_port: 9871
   rate: 250                        # state packets per second
   scene_interval: 1.0              # seconds between scene description repeats
+  command_host: 127.0.0.1          # interface the command listener binds to, 0.0.0.0 for remote renderers
+  command_port: 9872               # JSON commands from the renderer
 
 scene: scenes/default.yaml
 objects: objects.yaml

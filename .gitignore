@@ -20,6 +20,13 @@ firmware/sdkconfig.old
 firmware/dependencies.lock
 
 MUJOCO_LOG.TXT
+rendering/**/Binaries/
+rendering/**/Intermediate/
+rendering/**/Saved/
+rendering/**/DerivedDataCache/
+rendering/**/.vs/
+rendering/**/*.sln
+rendering/**/*.vsconfig
 config/calibration.yaml
 logs/
 *.log

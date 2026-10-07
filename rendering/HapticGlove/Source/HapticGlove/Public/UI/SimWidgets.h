@@ -10,6 +10,7 @@ class UImage;
 class UMaterialInstanceDynamic;
 class UProgressBar;
 class UTextBlock;
+class UTexture2D;
 class USimLinkSubsystem;
 
 UCLASS(Abstract)
@@ -106,7 +107,7 @@ class HAPTICGLOVE_API UStopButtonWidget : public USimWidgetBase
 
 public:
 	UPROPERTY(meta = (BindWidget)) TObjectPtr<UButton> StopButton;
-	UPROPERTY(meta = (BindWidget)) TObjectPtr<UTextBlock> StopLabel;
+	UPROPERTY(meta = (BindWidgetOptional)) TObjectPtr<UTextBlock> StopLabel;
 	UPROPERTY(meta = (BindWidgetOptional)) TObjectPtr<UButton> CalibrateButton;
 	UPROPERTY(meta = (BindWidgetOptional)) TObjectPtr<UTextBlock> CalibrateLabel;
 
@@ -125,6 +126,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style")
 	FLinearColor ResumeColor = FLinearColor(0.1f, 0.55f, 0.2f, 1.0f);
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style")
+	TObjectPtr<UTexture2D> StopImage;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style")
+	TObjectPtr<UTexture2D> StartImage;
+
 protected:
 	virtual void NativeConstruct() override;
 	virtual void Refresh(const FSimStatus& Status) override;
@@ -137,6 +144,11 @@ private:
 	/** Start the calibration countdown. */
 	UFUNCTION()
 	void HandleCalibrateClicked();
+
+	/** Show the stop or start image on all button states, or tint the background when no images are set. */
+	void ApplyStopLook(bool bStopped);
+
+	int32 ShownLook = -1;
 };
 
 UCLASS(Abstract)

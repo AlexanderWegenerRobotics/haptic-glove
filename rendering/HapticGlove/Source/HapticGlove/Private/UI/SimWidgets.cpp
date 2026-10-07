@@ -4,6 +4,7 @@
 #include "Components/Image.h"
 #include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
+#include "Engine/Texture2D.h"
 #include "Blueprint/WidgetTree.h"
 #include "EngineUtils.h"
 #include "HapticGloveLog.h"
@@ -190,8 +191,14 @@ void UStopButtonWidget::Refresh(const FSimStatus& Status)
 {
 	const bool bStopped = Status.Mode == ESimMode::Stopped;
 	StopButton->SetIsEnabled(Status.bConnected);
-	StopButton->SetBackgroundColor(bStopped ? ResumeColor : StopColor);
-	StopLabel->SetText(bStopped ? ResumeText : StopText);
+	if (ShownLook != static_cast<int32>(bStopped))
+	{
+		ApplyStopLook(bStopped);
+	}
+	if (StopLabel)
+	{
+		StopLabel->SetText(bStopped ? ResumeText : StopText);
+	}
 	if (CalibrateButton)
 	{
 		CalibrateButton->SetIsEnabled(Status.bConnected && Status.Countdown <= 0.0f);
@@ -208,6 +215,29 @@ void UStopButtonWidget::HandleStopClicked()
 	{
 		Sim->ToggleStop();
 	}
+}
+
+void UStopButtonWidget::ApplyStopLook(bool bStopped)
+{
+	ShownLook = static_cast<int32>(bStopped);
+	UTexture2D* Image = bStopped ? StartImage.Get() : StopImage.Get();
+	if (!Image)
+	{
+		StopButton->SetBackgroundColor(bStopped ? ResumeColor : StopColor);
+		return;
+	}
+	StopButton->SetBackgroundColor(FLinearColor::White);
+	FButtonStyle Style = StopButton->GetStyle();
+	const FVector2D Size(Image->GetSizeX(), Image->GetSizeY());
+	for (FSlateBrush* Brush : {&Style.Normal, &Style.Hovered, &Style.Pressed, &Style.Disabled})
+	{
+		Brush->SetResourceObject(Image);
+		Brush->ImageSize = Size;
+		Brush->DrawAs = ESlateBrushDrawType::Image;
+	}
+	Style.Pressed.TintColor = FSlateColor(FLinearColor(0.8f, 0.8f, 0.8f, 1.0f));
+	Style.Disabled.TintColor = FSlateColor(FLinearColor(0.5f, 0.5f, 0.5f, 0.6f));
+	StopButton->SetStyle(Style);
 }
 
 void UStopButtonWidget::HandleCalibrateClicked()
