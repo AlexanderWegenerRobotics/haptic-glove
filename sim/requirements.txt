@@ -2,4 +2,5 @@ mujoco>=3.3
 numpy
 pyyaml
 matplotlib
+pyserial
 openvr; sys_platform == "win32"

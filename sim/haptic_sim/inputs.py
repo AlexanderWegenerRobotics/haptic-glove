@@ -47,6 +47,13 @@ class FingerSource:
         '''Return an array of closures in [0, 1] per channel or None.'''
         return None
 
+    def write_feedback(self, feedback: np.ndarray, enable: bool) -> None:
+        '''Hand the per-channel feedback back to the source; only the glove uses it.'''
+
+    def log_values(self):
+        '''Glove columns for the run log, None for sources without a glove.'''
+        return None
+
 
 class ScriptFingers(FingerSource):
     '''Slow open/close cycle on all channels, for headless tests.'''
@@ -76,6 +83,37 @@ class TriggerFingers(FingerSource):
         return np.full(len(CHANNELS), self.max_closure * self.tracking.trigger())
 
 
+class GloveFingers(FingerSource):
+    '''Closures from the haptic glove (ESP32 or fake glove); low-passed feedback goes back as servo torque.'''
+
+    def __init__(self, cfg: dict):
+        '''Open or reuse the glove link and set up the feedback filter.'''
+        from .glove import open_glove
+
+        self.link = open_glove(cfg)
+        cutoff = cfg["glove"]["filter_hz"]
+        dt = cfg["simulation"]["timestep"]
+        self.alpha = float(np.exp(-2.0 * np.pi * cutoff * dt)) if cutoff > 0 else 0.0
+        self.filtered = np.zeros(len(CHANNELS))
+
+    def read(self, t):
+        '''Latest glove closures, None while the glove is silent so the sliders take over.'''
+        state = self.link.latest()
+        return None if state is None else np.clip(state.closure, 0.0, 1.0)
+
+    def write_feedback(self, feedback, enable):
+        '''Low-pass the feedback and send it; enable is False while not engaged or stopped.'''
+        self.filtered = self.alpha * self.filtered + (1.0 - self.alpha) * np.nan_to_num(feedback)
+        self.link.set_feedback(self.filtered, enable)
+
+    def log_values(self):
+        '''Torque sent, torque the glove applies, round trip in ms and glove flags.'''
+        state = self.link.latest()
+        if state is None:
+            return None
+        return np.concatenate([self.link.sent, state.torque, [state.rtt_us / 1000.0, state.flags]])
+
+
 def make_pose_source(cfg: dict, tracking=None) -> PoseSource:
     '''Create the configured wrist pose source.'''
     name = cfg["input"]["pose_source"]
@@ -97,4 +135,6 @@ def make_finger_source(cfg: dict, tracking=None) -> FingerSource:
         return ScriptFingers(cfg)
     if name == "trigger":
         return TriggerFingers(cfg, tracking)
+    if name == "glove":
+        return GloveFingers(cfg)
     raise ValueError(f"unknown finger_source '{name}'")

@@ -8,7 +8,9 @@ from .hand import CHANNELS
 
 FIELDS = ["t", "period", "step_time"] + [
     f"{kind}_{c}" for kind in ("cmd", "closure", "feedback", "contact") for c in CHANNELS
-] + ["trial", "mode"] + [f"tracked_{k}" for k in ("x", "y", "z", "qw", "qx", "qy", "qz")]
+] + ["trial", "mode"] + [f"tracked_{k}" for k in ("x", "y", "z", "qw", "qx", "qy", "qz")] + [
+    f"glove_{kind}_{c}" for kind in ("sent", "torque") for c in CHANNELS
+] + ["glove_rtt", "glove_flags"]
 
 
 class Recorder:
@@ -22,8 +24,8 @@ class Recorder:
         self.chunks = [np.empty((chunk, len(FIELDS)))]
         self.n = 0
 
-    def record(self, t, period, step_time, cmd, closure, feedback, contact, trial, mode, tracked) -> None:
-        '''Append one row, growing the buffer in chunks; the tracked pose is NaN while not tracked.'''
+    def record(self, t, period, step_time, cmd, closure, feedback, contact, trial, mode, tracked, glove=None) -> None:
+        '''Append one row, growing the buffer in chunks; tracked pose and glove columns are NaN when absent.'''
         if not self.enabled:
             return
         row = self.n % self.chunk
@@ -37,6 +39,7 @@ class Recorder:
             buf[17:24] = np.nan
         else:
             buf[17:20], buf[20:24] = tracked
+        buf[24:32] = np.nan if glove is None else glove
         self.n += 1
 
     def data(self) -> np.ndarray:

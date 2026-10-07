@@ -12,7 +12,7 @@ from .loop import PhysicsLoop
 from .outputs import UnrealPublisher
 from .recorder import Recorder, timing_summary
 from .scene import build_model, describe_scene, write_scene_description
-from .session import CommandQueue, Session, start_terminal_commands
+from .session import CommandQueue, Session, start_terminal_commands, start_udp_commands
 from .tracking import make_tracking
 
 
@@ -22,7 +22,7 @@ def parse_args(argv=None) -> argparse.Namespace:
     p.add_argument("--config", default=str(CONFIG_DIR / "sim.yaml"))
     p.add_argument("--scene", help="scene file, relative to config/ or absolute")
     p.add_argument("--hand", choices=["dexterous", "parallel_jaw"])
-    p.add_argument("--fingers", choices=["viewer", "script", "trigger"])
+    p.add_argument("--fingers", choices=["viewer", "script", "trigger", "glove"])
     p.add_argument("--pose", choices=["viewer", "fixed", "vive"])
     p.add_argument("--headless", action="store_true")
     p.add_argument("--duration", type=float)
@@ -92,8 +92,8 @@ def wait_headless(loop: PhysicsLoop, stop: threading.Event) -> None:
         pass
 
 
-def run_episode(cfg: dict, library: dict, commands: CommandQueue, stop: threading.Event, tracking,
-                reseed: bool) -> str:
+def run_episode(cfg: dict, library: dict, commands: CommandQueue, session: Session, stop: threading.Event, tracking,
+                reseed: bool) -> tuple[str, dict]:
     '''Build one scene, run physics with the viewer or headless until it ends, save the log and return why it ended.'''
     scene = load_scene(cfg["scene"], library, reseed)
     model = build_model(cfg, scene)
@@ -115,7 +115,7 @@ def run_episode(cfg: dict, library: dict, commands: CommandQueue, stop: threadin
 
     recorder = Recorder(cfg["recording"]["directory"], cfg["recording"]["enabled"])
     pose_source = make_pose_source(cfg, tracking)
-    session = Session(cfg, pose_source.tracked)
+    session.reset()
 
     def start_loop(lock) -> PhysicsLoop:
         '''Create and start the physics thread with the given lock factory.'''
@@ -142,24 +142,33 @@ def run_episode(cfg: dict, library: dict, commands: CommandQueue, stop: threadin
     log_path = recorder.save({"config": cfg, "scene": description})
     if log_path:
         print(f"log: {log_path}")
-    return loop.exit_reason
+    return loop.exit_reason, loop.exit_args
 
 
 def main(argv=None) -> None:
-    '''Start tracking and command inputs, then run scenes until stopped; reset_new rebuilds with a new draw.'''
+    '''Start tracking and command inputs, then run scenes until stopped; reset_new and set_hand rebuild the scene.'''
     args = parse_args(argv)
     cfg = apply_overrides(load_sim_config(args.config), args)
     library = load_object_library(cfg["objects"])
 
     commands = CommandQueue()
     start_terminal_commands(commands)
+    if cfg["unreal"]["enabled"]:
+        start_udp_commands(commands, cfg)
     tracking = make_tracking(cfg, commands.put)
+    session = Session(cfg, cfg["input"]["pose_source"] == "vive")
     stop = threading.Event()
     install_stop_handler(stop)
     try:
         reseed = False
-        while run_episode(cfg, library, commands, stop, tracking, reseed) == "reset_new" and not stop.is_set():
-            reseed = True
+        while not stop.is_set():
+            reason, args = run_episode(cfg, library, commands, session, stop, tracking, reseed)
+            if reason == "reset_new":
+                reseed = True
+            elif reason == "set_hand":
+                cfg["hand"]["type"] = args["hand"]
+            else:
+                break
     finally:
         if tracking:
             tracking.stop()

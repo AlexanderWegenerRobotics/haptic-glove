@@ -48,7 +48,8 @@ def main() -> None:
                     if desc["scene_id"] != scene_id:
                         scene_id = desc["scene_id"]
                         print(f"scene {scene_id}: hand {desc['hand']}, objects {[o['id'] for o in desc['objects']]}, "
-                              f"{len(desc['hand_joints'])} joints")
+                              f"{len(desc['hand_joints'])} joints, {len(desc['hand_bodies'])} bodies, "
+                              f"{len(desc['hand_geoms'])} geoms")
                     continue
                 last = decode_state(packet)
                 if last_seq is not None and last["seq"] > last_seq + 1:
@@ -63,7 +64,9 @@ def main() -> None:
                     print(f"{count / (now - window):6.1f} Hz  lost {lost}  latency mean {lat.mean():.2f} ms  "
                           f"max {lat.max():.2f} ms  sim t {last['sim_time']:.2f}  "
                           f"closure {np.round(last['closure'], 2)}  feedback {np.round(last['feedback'], 2)}  "
-                          f"{'engaged' if last['engaged'] else 'waiting'}{'  ghost' if last['ghost_visible'] else ''}")
+                          f"{'stopped' if last['stopped'] else 'engaged' if last['engaged'] else 'waiting'}"
+                          f"{'  ghost' if last['ghost_visible'] else ''}  trial {last['trial']}  "
+                          f"cmd {last['command_seq']}")
                     if args.verbose:
                         print(last)
                 count, lost, latencies, window = 0, 0, [], now

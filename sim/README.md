@@ -28,6 +28,7 @@ Useful overrides:
 --fingers script                 # automatic open/close cycle
 --pose fixed                     # hand stays at start pose
 --pose vive --fingers trigger    # SteamVR wand or tracker (Windows)
+--fingers glove                  # haptic glove or tools/fake_glove.py
 --headless --duration 10
 --no-record
 ```
@@ -54,7 +55,12 @@ Type in the terminal and press Enter, or use the wand buttons (mapping in `track
 | r | menu | reset same: objects and hand back to the start, back to waiting |
 | n | grip | reset new: new random draw (new scene id), viewer reopens |
 | c | trackpad | calibrate |
+| s | | stop: freeze hand and fingers until resume |
+| g | | resume: leave stop, engage again |
+| h | | switch hand (rebuilds the scene) |
 | q | | quit |
+
+The renderer sends the same commands as JSON on UDP 9872 (`protocol/unreal_udp.md`), e.g. calibrate with a countdown so the operator can look forward first.
 
 ## Config
 
@@ -77,6 +83,24 @@ While running, the sim streams state over UDP (`unreal:` in `sim.yaml`, `--no-un
 
 ```
 python tools/udp_listen.py
+```
+
+## Glove
+
+`finger_source: glove` (or `--fingers glove`) takes the closures from the glove and sends the per-channel feedback back as servo torque (`torque_scale`, `torque_limit` under `glove:` in `sim.yaml`). Torque is only enabled while the hand is engaged and not stopped. Protocol: `protocol/glove_serial.md`, firmware: `firmware/`.
+
+Without hardware, set `glove.transport: udp` and run the fake glove next to the sim:
+
+```
+python tools/fake_glove.py                   # k + Enter kill switch, q + Enter quit
+```
+
+It closes and opens the hand every 3 s and gives way to the rendered torque like a compliant operator (mass-spring-damper finger, same model and torque shaping as the firmware stub). `--delay-ms 1.7` gives the ~2 ms round trip of the real USB link, `--natural-hz 50` a nearly massless finger as a worst case for stability.
+
+Stability knobs under `glove:` in `sim.yaml`: `filter_hz` low-passes the feedback in the sim, `damping` and `slew_rate` are applied on the glove and sent with every feedback frame. Defaults (15 Hz, 0, 10 Nm/s) were tuned offline with the fake glove at 2 ms round trip: they remove the torque chatter even for the massless finger on the hard ball and cost little peak torque. Run logs contain `glove_sent_*` (torque sent), `glove_torque_*` (torque the glove applies), `glove_rtt` (ms) and `glove_flags`; `tools/plot_log.py` shows them in an extra row. To test the ESP32 alone (rate, loss, round trip), without the sim:
+
+```
+python tools/glove_monitor.py --port COM4
 ```
 
 ## Tools

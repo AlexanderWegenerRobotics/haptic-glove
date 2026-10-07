@@ -28,12 +28,14 @@ def load_log(path: Path):
 
 
 def plot(cols: dict, meta: dict, title: str):
-    '''Plot command, closure, feedback and contact force per channel, plus loop timing.'''
+    '''Plot command, closure, feedback and contact force per channel, glove torque if present, plus loop timing.'''
     import matplotlib.pyplot as plt
 
     t = cols["t"]
-    fig, axes = plt.subplots(4, 3, figsize=(14, 10))
-    for ax in list(axes[:3].flat) + [axes[3, 0]]:
+    glove = "glove_sent_thumb" in cols and np.isfinite(cols["glove_sent_thumb"]).any()
+    rows = 5 if glove else 4
+    fig, axes = plt.subplots(rows, 3, figsize=(14, 2.5 * rows))
+    for ax in list(axes[:rows - 1].flat) + [axes[rows - 1, 0]]:
         ax.sharex(axes[0, 0])
     for i, c in enumerate(CHANNELS):
         axes[0, i].plot(t, cols[f"cmd_{c}"], label="command")
@@ -49,18 +51,28 @@ def plot(cols: dict, meta: dict, title: str):
     axes[2, 0].set_ylabel("contact force [N]")
     axes[0, 2].legend(loc="upper right")
 
+    if glove:
+        rtt = np.nanmedian(cols["glove_rtt"])
+        for i, c in enumerate(CHANNELS):
+            axes[3, i].plot(t, cols[f"glove_sent_{c}"], label="sent")
+            axes[3, i].plot(t, cols[f"glove_torque_{c}"], label="glove")
+            axes[3, i].grid(alpha=0.3)
+        axes[3, 0].set_ylabel(f"glove torque [Nm]\nrtt median {rtt:.2f} ms")
+        axes[3, 2].legend(loc="upper right")
+
     period = cols["period"][1:] * 1e3
     step = cols["step_time"] * 1e3
-    axes[3, 0].plot(t[1:], period, lw=0.5)
-    axes[3, 0].set_ylabel("loop period [ms]")
-    axes[3, 0].set_xlabel("time [s]")
-    axes[3, 1].hist(np.clip(period, 0, 5), bins=100)
-    axes[3, 1].set_yscale("log")
-    axes[3, 1].set_xlabel("loop period [ms], clipped at 5")
-    axes[3, 2].hist(np.clip(step, 0, 2), bins=100, color="C1")
-    axes[3, 2].set_yscale("log")
-    axes[3, 2].set_xlabel("step time [ms], clipped at 2")
-    for ax in axes[3]:
+    timing = axes[rows - 1]
+    timing[0].plot(t[1:], period, lw=0.5)
+    timing[0].set_ylabel("loop period [ms]")
+    timing[0].set_xlabel("time [s]")
+    timing[1].hist(np.clip(period, 0, 5), bins=100)
+    timing[1].set_yscale("log")
+    timing[1].set_xlabel("loop period [ms], clipped at 5")
+    timing[2].hist(np.clip(step, 0, 2), bins=100, color="C1")
+    timing[2].set_yscale("log")
+    timing[2].set_xlabel("step time [ms], clipped at 2")
+    for ax in timing:
         ax.grid(alpha=0.3)
 
     scene = meta.get("scene", {})
