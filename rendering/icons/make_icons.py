@@ -37,15 +37,17 @@ def button(top, bottom, body, width=200):
 
 
 def calibrate():
-    """Alignment reticle: ring, four ticks crossing it and a centre dot."""
+    """Alignment reticle centred on a wide button that matches START and STOP."""
     ticks = []
     for x1, y1, x2, y2 in [(100, 38, 100, 72), (100, 128, 100, 162), (38, 100, 72, 100), (128, 100, 162, 100)]:
         ticks.append(f'  <line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="white" stroke-width="12" stroke-linecap="round"/>')
     return button("#7a5a10", "#1a1204", "\n".join([
+        '  <g transform="translate(120,0)">',
         '  <circle cx="100" cy="100" r="44" fill="white" fill-opacity="0.10" stroke="white" stroke-width="12"/>',
         *ticks,
         '  <circle cx="100" cy="100" r="11" fill="white"/>',
-    ]))
+        '  </g>',
+    ]), width=440)
 
 
 def new_scene():
