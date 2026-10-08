@@ -6,6 +6,7 @@
 #include "Math/RotationMatrix.h"
 #include "HapticGloveLog.h"
 #include "Networking/SimLinkSubsystem.h"
+#include "Scene/EnvironmentSubsystem.h"
 #include "UObject/ConstructorHelpers.h"
 
 namespace
@@ -90,6 +91,7 @@ void ASimSceneActor::Clear()
 	SquashMeshes.Reset();
 	FingerTints.Reset();
 	ObjectRadius.Reset();
+	SquashRest.Reset();
 	GhostNode = nullptr;
 	BuiltSceneId.Reset();
 }
@@ -102,17 +104,27 @@ void ASimSceneActor::Build(const FSimScene& Scene)
 		UE_LOG(LogHapticGlove, Error, TEXT("SimScene: missing assets (cube %d, sphere %d, cylinder %d, material %d)"), CubeMesh != nullptr, SphereMesh != nullptr, CylinderMesh != nullptr, SolidMaterial != nullptr);
 	}
 
+	const FHapticEnvironment* Environment = nullptr;
+	if (UEnvironmentSubsystem* Environments = GetWorld()->GetSubsystem<UEnvironmentSubsystem>())
+	{
+		Environments->Apply(Scene);
+		Environment = Environments->Current();
+	}
+	UMaterialInterface* TableBase = Environment ? Environment->TableMaterial.LoadSynchronous() : nullptr;
+
 	const FSimTable& T = Scene.Table;
-	UMaterialInstanceDynamic* TableMaterial = MakeMaterial(SolidMaterial, T.Color);
+	UMaterialInstanceDynamic* TableMaterial = MakeMaterial(TableBase ? TableBase : SolidMaterial.Get(), TableBase ? FLinearColor::White : T.Color);
 	USceneComponent* Table = AddNode(RootComponent);
 	AddMesh(Table, CubeMesh, FTransform(FQuat::Identity, T.TopCenter, T.Size / 100.0), TableMaterial);
-	if (bTableLegs)
+	if (Environment ? Environment->bTableLegs : bTableLegs)
 	{
+		UMaterialInterface* LegBase = Environment ? Environment->LegMaterial.LoadSynchronous() : nullptr;
+		UMaterialInstanceDynamic* LegMaterial = LegBase ? MakeMaterial(LegBase, FLinearColor::White) : TableMaterial;
 		const double LegHeight = T.Height - T.Size.Z;
 		for (const FVector2D Sign : {FVector2D(1.0, 1.0), FVector2D(1.0, -1.0), FVector2D(-1.0, 1.0), FVector2D(-1.0, -1.0)})
 		{
 			const FVector Center(T.TopCenter.X + Sign.X * (0.5 * T.Size.X - LegInset), T.TopCenter.Y + Sign.Y * (0.5 * T.Size.Y - LegInset), 0.5 * LegHeight);
-			AddMesh(Table, CubeMesh, FTransform(FQuat::Identity, Center, FVector(LegHalfWidth / 50.0, LegHalfWidth / 50.0, LegHeight / 100.0)), TableMaterial);
+			AddMesh(Table, CubeMesh, FTransform(FQuat::Identity, Center, FVector(LegHalfWidth / 50.0, LegHalfWidth / 50.0, LegHeight / 100.0)), LegMaterial);
 		}
 	}
 
@@ -120,10 +132,15 @@ void ASimSceneActor::Build(const FSimScene& Scene)
 	{
 		USceneComponent* Node = AddNode(RootComponent);
 		Node->SetWorldTransform(Object.Initial);
-		UStaticMeshComponent* Mesh = AddShape(Node, Object.Shape, Object.Size, FTransform::Identity, MakeMaterial(SolidMaterial, Object.Color));
-		const bool bSquash = Object.bDeformable && Object.Shape == TEXT("sphere");
+		UStaticMeshComponent* Mesh = AddVisual(Node, Object);
+		if (!Mesh)
+		{
+			Mesh = AddShape(Node, Object.Shape, Object.Size, FTransform::Identity, MakeMaterial(SolidMaterial, Object.Color));
+		}
+		const bool bSquash = Mesh && Object.bDeformable && Object.Shape == TEXT("sphere");
 		ObjectNodes.Add(Node);
 		SquashMeshes.Add(bSquash ? Mesh : nullptr);
+		SquashRest.Add(Mesh ? Mesh->GetRelativeTransform() : FTransform::Identity);
 		ObjectRadius.Add(Object.Size.X);
 	}
 
@@ -195,17 +212,18 @@ void ASimSceneActor::ApplySquash(int32 Index, const FSimObjectState& Object)
 		return;
 	}
 	const double Radius = ObjectRadius[Index];
+	const FTransform& Rest = SquashRest[Index];
 	if (Object.SquashDepth > 0.01f && !Object.SquashDir.IsNearlyZero())
 	{
 		const FVector Dir = Object.SquashDir.GetSafeNormal();
 		const double Squeeze = FMath::Clamp(1.0 - Object.SquashDepth / (2.0 * Radius), 1.0 - MaxSquash, 1.0);
 		const double Bulge = 1.0 / FMath::Sqrt(Squeeze);
 		Mesh->SetWorldLocationAndRotation(ObjectNodes[Index]->GetComponentLocation() + Dir * (0.5 * Object.SquashDepth), FRotationMatrix::MakeFromZ(Dir).ToQuat());
-		Mesh->SetWorldScale3D(FVector(Bulge, Bulge, Squeeze) * (Radius / 50.0));
+		Mesh->SetWorldScale3D(FVector(Bulge, Bulge, Squeeze) * Rest.GetScale3D().X);
 	}
 	else
 	{
-		Mesh->SetRelativeTransform(FTransform(FQuat::Identity, FVector::ZeroVector, FVector(Radius / 50.0)));
+		Mesh->SetRelativeTransform(Rest);
 	}
 }
 
@@ -231,6 +249,44 @@ UStaticMeshComponent* ASimSceneActor::AddMesh(USceneComponent* Parent, UStaticMe
 	Component->SetupAttachment(Parent);
 	Component->RegisterComponent();
 	Created.Add(Component);
+	return Component;
+}
+
+UStaticMeshComponent* ASimSceneActor::AddVisual(USceneComponent* Parent, const FSimObject& Object)
+{
+	if (Object.Visual.IsEmpty())
+	{
+		return nullptr;
+	}
+	const TSoftObjectPtr<UStaticMesh>* Entry = GetDefault<UHapticGloveSettings>()->ObjectVisuals.Find(Object.Visual);
+	UStaticMesh* Mesh = Entry ? Entry->LoadSynchronous() : nullptr;
+	if (!Mesh)
+	{
+		if (!MissingVisuals.Contains(Object.Visual))
+		{
+			MissingVisuals.Add(Object.Visual);
+			UE_LOG(LogHapticGlove, Warning, TEXT("SimScene: visual '%s' is not mapped in Project Settings > Haptic Glove > Object Visuals, using the primitive"), *Object.Visual);
+		}
+		return nullptr;
+	}
+	const FBox Bounds = Mesh->GetBoundingBox();
+	const FVector Extent = Bounds.GetExtent().ComponentMax(FVector(0.01));
+	FVector Half = Object.Size;
+	if (Object.Shape == TEXT("sphere"))
+	{
+		Half = FVector(Object.Size.X);
+	}
+	else if (Object.Shape == TEXT("cylinder") || Object.Shape == TEXT("capsule"))
+	{
+		Half = FVector(Object.Size.X, Object.Size.X, Object.Shape == TEXT("capsule") ? Object.Size.X + Object.Size.Y : Object.Size.Y);
+	}
+	FVector Scale = Half / Extent;
+	if (Object.Shape == TEXT("sphere"))
+	{
+		Scale = FVector(Scale.GetMin());
+	}
+	UStaticMeshComponent* Component = AddMesh(Parent, Mesh, FTransform(FQuat::Identity, -Bounds.GetCenter() * Scale, Scale), nullptr);
+	Component->EmptyOverrideMaterials();
 	return Component;
 }
 

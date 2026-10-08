@@ -93,11 +93,12 @@ def describe_scene(scene: SceneSpec, cfg: dict) -> dict:
         "created": time.strftime("%Y-%m-%dT%H:%M:%S"),
         "frame": "mujoco_z_up_meters",
         "hand": cfg["hand"]["type"],
+        "environment": scene.environment,
         "table": {"position": [t.position[0], t.position[1], t.height - t.size[2] / 2],
                   "size": t.size, "height": t.height, "rgba": t.rgba},
         "objects": [
             {"id": o.id, "type": o.type.name, "shape": o.type.shape, "size": o.type.size,
-             "rgba": o.type.rgba, "deformable": o.type.deformable,
+             "rgba": o.type.rgba, "deformable": o.type.deformable, "visual": o.type.visual,
              "position": o.position, "orientation": o.orientation}
             for o in scene.objects
         ],

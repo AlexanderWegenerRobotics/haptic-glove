@@ -1,3 +1,5 @@
+environment: lab                  # none | lab | kitchen | studio, key in Project Settings > Haptic Glove > Environments
+
 table:
   position: [0.5, 0.0]
   size: [0.8, 0.6, 0.04]

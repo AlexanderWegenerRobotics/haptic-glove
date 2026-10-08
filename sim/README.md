@@ -66,7 +66,7 @@ The renderer sends the same commands as JSON on UDP 9872 (`protocol/unreal_udp.m
 
 - `config/sim.yaml` rates, hand type, input sources, tracking, session, recording
 - `config/objects.yaml` object library (shape, size, mass, contact softness)
-- `config/scenes/*.yaml` table, slots, and objects or a random sample
+- `config/scenes/*.yaml` environment, table, slots, and objects or a random sample
 
 Contact softness is set by `contact_time`. MuJoCo contacts are mass-normalized, so the felt stiffness also depends on object mass. Use `tools/probe_grasp.py` to measure what an object actually feels like.
 
@@ -74,10 +74,10 @@ Contact softness is set by `contact_time`. MuJoCo contacts are mass-normalized, 
 
 Every start of the sim is one session with its own folder `logs/<YYYYmmdd_HHMMSS>/`:
 
-- `session.json` config, scene list and the trial table (trial number, scene, wall clock start and end), rewritten after every scene
+- `session.json` config, segment list (with `ended_by`: stop, reset_new, quit, ...) and the trial table (trial number, segment, wall clock start and end), rewritten after every segment
 - `scene_<nn>_<id>.json` scene description for the renderer
-- `scene_<nn>_<id>.npz` per-step log (`data`, `fields`, `meta`), one per scene; `trial` counts resets across the whole session (a new scene or hand also starts a new trial), `mode` is 0 waiting / 1 engaged, `tracked_*` is the tracked wrist pose (NaN while not tracked), `wall` is Unix time
-- `video_<stream>.mp4` and `video_<stream>.json` from Unreal: the operator view with game audio and microphone, one chapter per trial; the json maps frames to Unix time, trial and sim time
+- `scene_<nn>_<id>.npz` per-step log (`data`, `fields`, `meta`), one per scene, split at every stop: the stop command writes the segment so far (in the background), nothing is logged while stopped, and resume starts `scene_<nn>_<id>_2.npz`, `_3`, ...; glove columns are part of these rows; `trial` counts resets across the whole session (a new scene or hand also starts a new trial), `mode` is 0 waiting / 1 engaged, `tracked_*` is the tracked wrist pose (NaN while not tracked), `wall` is Unix time
+- `video_<stream>.mp4` and `video_<stream>.json` from Unreal: the operator view with game audio and microphone, one chapter per trial; the json maps frames to Unix time, trial and sim time; Unreal closes the take when the sim is stopped and starts a new one on resume (`video_<stream>_2.mp4`, ...)
 
 ## Unreal stream
 

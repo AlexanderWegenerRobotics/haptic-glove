@@ -84,6 +84,9 @@ private:
 	/** Create a mesh without collision under a parent. */
 	UStaticMeshComponent* AddMesh(USceneComponent* Parent, UStaticMesh* Mesh, const FTransform& Local, UMaterialInstanceDynamic* Material);
 
+	/** Mesh from the object visual map, scaled and centered to fill the primitive's bounds; nullptr when unmapped. */
+	UStaticMeshComponent* AddVisual(USceneComponent* Parent, const FSimObject& Object);
+
 	/** Create the meshes for one MuJoCo primitive (sizes in cm, MuJoCo conventions); returns the main mesh. */
 	UStaticMeshComponent* AddShape(USceneComponent* Parent, const FString& Type, const FVector& Size, const FTransform& Local, UMaterialInstanceDynamic* Material);
 
@@ -105,5 +108,7 @@ private:
 	UPROPERTY() TObjectPtr<USimLinkSubsystem> Link;
 
 	TArray<float> ObjectRadius;
+	TArray<FTransform> SquashRest;
+	TSet<FString> MissingVisuals;
 	FString BuiltSceneId;
 };

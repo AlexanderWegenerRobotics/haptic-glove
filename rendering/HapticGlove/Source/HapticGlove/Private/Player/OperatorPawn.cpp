@@ -91,8 +91,20 @@ void AOperatorPawn::SetDebugPanelVisible(bool bVisible)
 		const UClass* WidgetClass = Widget->GetWidgetClass();
 		if (Widget->ComponentHasTag(TEXT("Debug")) || (WidgetClass && WidgetClass->IsChildOf(UDebugPanelWidget::StaticClass())))
 		{
-			Widget->SetVisibility(bVisible, true);
-			Widget->SetCollisionEnabled(bVisible ? ECollisionEnabled::QueryOnly : ECollisionEnabled::NoCollision);
+			UBodyAnchorComponent* Anchor = nullptr;
+			for (USceneComponent* Parent = Widget->GetAttachParent(); Parent && !Anchor; Parent = Parent->GetAttachParent())
+			{
+				Anchor = Cast<UBodyAnchorComponent>(Parent);
+			}
+			if (Anchor)
+			{
+				Anchor->SetAnchorEnabled(bVisible);
+			}
+			else
+			{
+				Widget->SetVisibility(bVisible, true);
+				Widget->SetCollisionEnabled(bVisible ? ECollisionEnabled::QueryOnly : ECollisionEnabled::NoCollision);
+			}
 			Count += 1;
 		}
 	}

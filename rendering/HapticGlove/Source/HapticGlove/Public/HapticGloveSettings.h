@@ -5,6 +5,10 @@
 #include "Sound/SoundBase.h"
 #include "HapticGloveSettings.generated.h"
 
+class UMaterialInterface;
+class UStaticMesh;
+class UWorld;
+
 UENUM(BlueprintType)
 enum class EUiSound : uint8
 {
@@ -17,6 +21,25 @@ enum class EUiSound : uint8
 	CalibrateTwo,
 	CalibrateThree,
 	CalibrateDone
+};
+
+USTRUCT()
+struct FHapticEnvironment
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, Category = "Environment")
+	TSoftObjectPtr<UWorld> Level;
+
+	UPROPERTY(EditAnywhere, Category = "Environment")
+	TSoftObjectPtr<UMaterialInterface> TableMaterial;
+
+	/** Material of the table legs, the table material when empty. */
+	UPROPERTY(EditAnywhere, Category = "Environment")
+	TSoftObjectPtr<UMaterialInterface> LegMaterial;
+
+	UPROPERTY(EditAnywhere, Category = "Environment")
+	bool bTableLegs = true;
 };
 
 UCLASS(Config = Game, DefaultConfig, meta = (DisplayName = "Haptic Glove"))
@@ -87,6 +110,12 @@ public:
 
 	UPROPERTY(Config, EditAnywhere, Category = "Recording")
 	FString FfmpegPath;
+
+	UPROPERTY(Config, EditAnywhere, Category = "Environments")
+	TMap<FString, FHapticEnvironment> Environments;
+
+	UPROPERTY(Config, EditAnywhere, Category = "Environments")
+	TMap<FString, TSoftObjectPtr<UStaticMesh>> ObjectVisuals;
 
 	UPROPERTY(Config, EditAnywhere, Category = "Sound")
 	bool bUiSounds = true;

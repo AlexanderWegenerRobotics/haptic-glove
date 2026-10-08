@@ -31,18 +31,20 @@ Unreal uses the same alignment so the headset view and the hand agree. With the 
 `"HGSC"` followed by JSON:
 
 ```
-scene_id, scene_name, seed, created, frame, hand ("dexterous" | "parallel_jaw"), protocol_version,
+scene_id, scene_name, seed, created, frame, hand ("dexterous" | "parallel_jaw"), environment, protocol_version,
 hand_joints [names, order of joints in the state packet],
 hand_bodies [names, order of body poses in the state packet],
 hand_geoms [{body (index into hand_bodies), type, size, position, orientation, rgba}],
 table {position (center of the top plate), size [x, y, thickness], height, rgba},
-objects [{id, type, shape, size, rgba, deformable, position, orientation}],
+objects [{id, type, shape, size, rgba, deformable, visual, position, orientation}],
 stream {host, state_port, scene_port, rate},
 tracking {yaw (rad), position [x, y, z], grip [w, x, y, z], created} or null,
 session {id, directory}
 ```
 
 `session` names the sim session (one per sim start) and its log folder. Unreal records its videos into that folder, or into `Saved/Sessions/<id>` when the field is empty, and starts a new recording when `id` changes.
+
+`environment` names the Unreal environment level (`none` keeps the default grid scene); Unreal maps it in Project Settings > Haptic Glove > Environments and streams the level so its origin sits on the floor under the table center. `visual` is an optional object mesh key mapped in Object Visuals; the mesh is scaled to the primitive's bounds, physics always uses the primitive.
 
 Geom types are `sphere | capsule | ellipsoid | cylinder | box` with MuJoCo sizes: sphere `[r]`, capsule and cylinder `[r, half_length]` along local z, ellipsoid and box half sizes `[x, y, z]`. Hand geom `position`/`orientation` are relative to their body. Object order in `objects` is the order used in the state packet.
 

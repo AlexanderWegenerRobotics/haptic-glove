@@ -107,8 +107,9 @@ class PhysicsLoop(threading.Thread):
                 self.publisher.send(packet)
             self.finger_source.write_feedback(feedback, self.session.mode == ENGAGED)
 
-            self.recorder.record(t, period, step_time, cmd, closure, feedback, contact, self.session.trial,
-                                 self.session.mode, tracked, self.finger_source.log_values())
+            if not self.session.stopped:
+                self.recorder.record(t, period, step_time, cmd, closure, feedback, contact, self.session.trial,
+                                     self.session.mode, tracked, self.finger_source.log_values())
             if self.duration and d.time >= self.duration:
                 self.exit_reason = "duration"
                 break
@@ -163,6 +164,7 @@ class PhysicsLoop(threading.Thread):
                 print(f"calibrating in {delay:.1f} s")
         elif name == "stop":
             self.session.stop()
+            self.recorder.end_segment("stop")
         elif name == "resume":
             self.session.resume()
         elif name == "set_hand":

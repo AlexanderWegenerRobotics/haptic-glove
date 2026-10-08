@@ -35,6 +35,7 @@ struct FSimObject
 	UPROPERTY(BlueprintReadOnly) FVector Size = FVector::ZeroVector;
 	UPROPERTY(BlueprintReadOnly) FLinearColor Color = FLinearColor::White;
 	UPROPERTY(BlueprintReadOnly) bool bDeformable = false;
+	UPROPERTY(BlueprintReadOnly) FString Visual;
 	UPROPERTY(BlueprintReadOnly) FTransform Initial;
 };
 
@@ -73,6 +74,7 @@ struct FSimScene
 	UPROPERTY(BlueprintReadOnly) FSimTable Table;
 	UPROPERTY(BlueprintReadOnly) TArray<FSimObject> Objects;
 	UPROPERTY(BlueprintReadOnly) FSimTracking Tracking;
+	UPROPERTY(BlueprintReadOnly) FString Environment;
 	UPROPERTY(BlueprintReadOnly) FString SessionId;
 	UPROPERTY(BlueprintReadOnly) FString SessionDirectory;
 };

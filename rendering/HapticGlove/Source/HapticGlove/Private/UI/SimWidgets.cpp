@@ -370,8 +370,10 @@ void UCountdownWidget::Refresh(const FSimStatus& Status)
 	if (Status.Countdown <= 0.0f || Second > static_cast<float>(MaxShown))
 	{
 		SetRenderOpacity(0.0f);
+		SetVisibility(ESlateVisibility::Hidden);
 		return;
 	}
+	SetVisibility(ESlateVisibility::HitTestInvisible);
 	CountText->SetText(FText::AsNumber(static_cast<int32>(Second)));
 	SetRenderOpacity(FMath::Lerp(MinOpacity, 1.0f, 1.0f - (Second - Status.Countdown)));
 }

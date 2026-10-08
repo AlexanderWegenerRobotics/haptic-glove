@@ -5,6 +5,7 @@
 #include "EyeTrackerFunctionLibrary.h"
 #include "EyeTrackerTypes.h"
 #include "GameFramework/Pawn.h"
+#include "HapticGloveLog.h"
 #include "InputCoreTypes.h"
 #include "UI/SimWidgets.h"
 
@@ -86,17 +87,30 @@ void UGazeInteractionComponent::UpdateRay()
 {
 	FVector Origin = FVector::ZeroVector;
 	FVector Direction = FVector::ForwardVector;
+	const bool bWasEyeGaze = bEyeGaze;
 	bEyeGaze = false;
 
-	if (bUseEyeTracking && UEyeTrackerFunctionLibrary::IsEyeTrackerConnected())
+	const bool bConnected = bUseEyeTracking && UEyeTrackerFunctionLibrary::IsEyeTrackerConnected();
+	float Confidence = -1.0f;
+	if (bConnected)
 	{
 		FEyeTrackerGazeData Gaze;
-		if (UEyeTrackerFunctionLibrary::GetGazeData(Gaze) && Gaze.ConfidenceValue >= MinConfidence && !Gaze.GazeDirection.IsNearlyZero())
+		if (UEyeTrackerFunctionLibrary::GetGazeData(Gaze))
 		{
-			Origin = Gaze.GazeOrigin;
-			Direction = Gaze.GazeDirection;
-			bEyeGaze = true;
+			Confidence = Gaze.ConfidenceValue;
+			if (Gaze.ConfidenceValue >= MinConfidence && !Gaze.GazeDirection.IsNearlyZero())
+			{
+				Origin = Gaze.GazeOrigin;
+				Direction = Gaze.GazeDirection;
+				bEyeGaze = true;
+			}
 		}
+	}
+	if (bEyeGaze != bWasEyeGaze || !bLoggedSource)
+	{
+		bLoggedSource = true;
+		UE_LOG(LogHapticGlove, Log, TEXT("Gaze source: %s (eye tracker %s, confidence %.2f, min %.2f)"),
+			bEyeGaze ? TEXT("eyes") : TEXT("head"), bConnected ? TEXT("connected") : TEXT("not connected"), Confidence, MinConfidence);
 	}
 	if (!bEyeGaze && Camera.IsValid())
 	{

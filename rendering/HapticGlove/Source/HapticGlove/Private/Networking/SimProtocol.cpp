@@ -182,6 +182,7 @@ bool SimProtocol::ParseScene(const uint8* Data, int32 Size, FSimScene& Out)
 	Out.SceneId = Root->GetStringField(TEXT("scene_id"));
 	Out.SceneName = Root->GetStringField(TEXT("scene_name"));
 	Out.Hand = Root->GetStringField(TEXT("hand"));
+	Root->TryGetStringField(TEXT("environment"), Out.Environment);
 
 	for (const TSharedPtr<FJsonValue>& Name : Root->GetArrayField(TEXT("hand_bodies")))
 	{
@@ -216,6 +217,7 @@ bool SimProtocol::ParseScene(const uint8* Data, int32 Size, FSimScene& Out)
 		Object.Size = 100.0 * ReadVector(O->GetArrayField(TEXT("size")));
 		Object.Color = ReadColor(O->GetArrayField(TEXT("rgba")));
 		Object.bDeformable = O->GetBoolField(TEXT("deformable"));
+		O->TryGetStringField(TEXT("visual"), Object.Visual);
 		Object.Initial = FTransform(ReadRotation(O->GetArrayField(TEXT("orientation"))),
 		                            ReadPosition(O->GetArrayField(TEXT("position"))));
 		Out.Objects.Add(Object);

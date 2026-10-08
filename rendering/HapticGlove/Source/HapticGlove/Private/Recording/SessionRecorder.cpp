@@ -116,20 +116,36 @@ void USessionRecorder::Tick(float DeltaTime)
 		return;
 	}
 	const double Now = FPlatformTime::Seconds();
+	const FSimStatus Status = Link->GetStatus();
+	const bool bSimStopped = Status.bConnected && Status.Mode == ESimMode::Stopped;
 	if (Link->HasScene())
 	{
 		const FSimScene& Scene = Link->GetSceneRef();
-		if (!Scene.SessionId.IsEmpty() && Scene.SessionId != SessionId)
+		const bool bNewSession = !Scene.SessionId.IsEmpty() && Scene.SessionId != SessionId;
+		const bool bResume = bPausedForStop && !bRecording && Scene.SessionId == SessionId && Status.bConnected && !bSimStopped;
+		if (bNewSession)
 		{
 			Stop();
+			SessionId = Scene.SessionId;
+			bPausedForStop = bSimStopped;
+		}
+		if ((bNewSession && !bSimStopped) || bResume)
+		{
 			Start(Scene);
+			bPausedForStop = false;
 		}
 	}
 	if (!bRecording)
 	{
 		return;
 	}
-	const FSimStatus Status = Link->GetStatus();
+	if (bSimStopped)
+	{
+		UE_LOG(LogHapticGlove, Log, TEXT("Recording: sim stopped, closing take %d of session %s"), Take, *SessionId);
+		Stop();
+		bPausedForStop = true;
+		return;
+	}
 	if (Status.bConnected)
 	{
 		LastConnected = Now;

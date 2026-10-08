@@ -12,6 +12,7 @@ ULogCameraComponent::ULogCameraComponent()
 	CaptureSource = ESceneCaptureSource::SCS_FinalColorLDR;
 	FOVAngle = 100.0f;
 	ShowFlags.SetMotionBlur(false);
+	ShowFlags.SetTemporalAA(false);
 }
 
 UTextureRenderTarget2D* ULogCameraComponent::GetLogTarget()

@@ -1,4 +1,6 @@
 import json
+import queue
+import threading
 import time
 from pathlib import Path
 
@@ -14,14 +16,20 @@ FIELDS = ["t", "period", "step_time"] + [
 
 
 class Recorder:
-    '''Buffers one row per physics step in memory and writes a compressed npz at the end.'''
+    '''Buffers one row per physics step; each segment (until a stop or the end of the scene) becomes its own npz.'''
 
-    def __init__(self, directory: str, enabled: bool = True, chunk: int = 60_000):
-        '''Prepare the first buffer chunk.'''
-        self.directory = Path(directory)
+    def __init__(self, session_log: "SessionLog", stem: str, scene_id: str, meta: dict, enabled: bool = True,
+                 chunk: int = 60_000):
+        '''Remember where segments go and prepare the first buffer chunk.'''
+        self.session_log, self.stem, self.scene_id, self.meta = session_log, stem, scene_id, meta
         self.enabled = enabled
         self.chunk = chunk
-        self.chunks = [np.empty((chunk, len(FIELDS)))]
+        self.segment = 0
+        self._reset()
+
+    def _reset(self) -> None:
+        '''Start an empty buffer.'''
+        self.chunks = [np.empty((self.chunk, len(FIELDS)))]
         self.n = 0
 
     def record(self, t, period, step_time, cmd, closure, feedback, contact, trial, mode, tracked, glove=None) -> None:
@@ -43,18 +51,14 @@ class Recorder:
         buf[32] = time.time()
         self.n += 1
 
-    def data(self) -> np.ndarray:
-        '''Return all recorded rows as one array.'''
-        return np.concatenate(self.chunks)[: self.n]
-
-    def save(self, meta: dict, stem: str) -> Path | None:
-        '''Write the rows plus metadata to <directory>/<stem>.npz.'''
+    def end_segment(self, reason: str) -> None:
+        '''Hand the rows so far to the session writer and start empty; cheap enough to call from the physics thread.'''
         if not self.enabled or self.n == 0:
-            return None
-        self.directory.mkdir(parents=True, exist_ok=True)
-        path = self.directory / f"{stem}.npz"
-        np.savez_compressed(path, data=self.data(), fields=np.array(FIELDS), meta=json.dumps(meta))
-        return path
+            return
+        self.segment += 1
+        stem = self.stem if self.segment == 1 else f"{self.stem}_{self.segment}"
+        self.session_log.write_segment(stem, self.scene_id, self.chunks, self.n, json.dumps(self.meta), reason)
+        self._reset()
 
 
 class SessionLog:
@@ -68,6 +72,10 @@ class SessionLog:
         self.info = {"session_id": self.id, "created": time.strftime("%Y-%m-%dT%H:%M:%S"), "start_unix": time.time(),
                      "config": cfg, "scenes": [], "trials": []}
         self.scene_count = 0
+        self.lock = threading.Lock()
+        self.jobs = queue.Queue()
+        self.writer = threading.Thread(target=self._write_segments, daemon=True, name="log_writer")
+        self.writer.start()
         self._write()
 
     def as_dict(self) -> dict:
@@ -79,18 +87,42 @@ class SessionLog:
         self.scene_count += 1
         return f"scene_{self.scene_count:02d}_{scene_id}"
 
-    def add_scene(self, stem: str, scene_id: str, rows: np.ndarray) -> None:
-        '''Append the scene and the trials it contained, with wall clock start and end per trial.'''
+    def write_segment(self, stem: str, scene_id: str, chunks: list, n: int, meta: str, reason: str) -> None:
+        '''Queue one recorded segment for the background writer.'''
+        if self.enabled:
+            self.jobs.put((stem, scene_id, chunks, n, meta, reason))
+
+    def close(self) -> None:
+        '''Wait until every queued segment is on disk.'''
+        self.jobs.put(None)
+        self.writer.join()
+
+    def _write_segments(self) -> None:
+        '''Write queued segments to <stem>.npz, add them to session.json and print their timing.'''
+        while (job := self.jobs.get()) is not None:
+            stem, scene_id, chunks, n, meta, reason = job
+            rows = np.concatenate(chunks)[:n]
+            self.directory.mkdir(parents=True, exist_ok=True)
+            path = self.directory / f"{stem}.npz"
+            np.savez_compressed(path, data=rows, fields=np.array(FIELDS), meta=meta)
+            self.add_scene(stem, scene_id, rows, reason)
+            timestep = json.loads(meta)["config"]["simulation"]["timestep"]
+            print(f"log: {path} ({rows[-1, 0] - rows[0, 0]:.0f} s sim time, ended by {reason})")
+            print(timing_summary(rows[:, 1], rows[:, 2], timestep))
+
+    def add_scene(self, stem: str, scene_id: str, rows: np.ndarray, reason: str) -> None:
+        '''Append the segment and the trials it contained, with wall clock start and end per trial.'''
         if not self.enabled or not len(rows):
             return
         trial, wall = rows[:, FIELDS.index("trial")], rows[:, FIELDS.index("wall")]
-        self.info["scenes"].append({"stem": stem, "scene_id": scene_id, "start_unix": float(wall[0]),
-                                    "end_unix": float(wall[-1])})
-        for number in dict.fromkeys(trial.astype(int).tolist()):
-            sel = wall[trial == number]
-            self.info["trials"].append({"trial": number, "scene": stem, "scene_id": scene_id,
-                                        "start_unix": float(sel[0]), "end_unix": float(sel[-1])})
-        self._write()
+        with self.lock:
+            self.info["scenes"].append({"stem": stem, "scene_id": scene_id, "start_unix": float(wall[0]),
+                                        "end_unix": float(wall[-1]), "ended_by": reason})
+            for number in dict.fromkeys(trial.astype(int).tolist()):
+                sel = wall[trial == number]
+                self.info["trials"].append({"trial": number, "scene": stem, "scene_id": scene_id,
+                                            "start_unix": float(sel[0]), "end_unix": float(sel[-1])})
+            self._write()
 
     def _write(self) -> None:
         '''Rewrite session.json.'''

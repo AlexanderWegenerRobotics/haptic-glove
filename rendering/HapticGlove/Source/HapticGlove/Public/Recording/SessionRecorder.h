@@ -72,6 +72,7 @@ private:
 	FString SessionId;
 	FString Directory;
 	bool bRecording = false;
+	bool bPausedForStop = false;
 	int32 Fps = 30;
 	int32 Take = 1;
 	int64 FrameIndex = 0;

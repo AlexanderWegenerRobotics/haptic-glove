@@ -7,6 +7,7 @@ ball_soft:
   contact_time: 0.015               # contact time constant in s, larger = softer, >= 2 * timestep
   damping_ratio: 1.0
   deformable: true                 # true | false, visual squash in Unreal
+  visual: ""                       # optional mesh key in Project Settings > Haptic Glove > Object Visuals, empty = primitive
 
 ball_hard:
   shape: sphere

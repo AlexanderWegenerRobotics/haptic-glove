@@ -21,6 +21,7 @@ class ObjectType:
     contact_time: float = 0.01
     damping_ratio: float = 1.0
     deformable: bool = False
+    visual: str = ""
 
     def half_height(self) -> float:
         '''Distance from the object origin to its resting contact with the table.'''
@@ -57,6 +58,7 @@ class SceneSpec:
     table: TableSpec
     objects: list
     seed: int | None
+    environment: str = "none"
 
 
 def load_yaml(path: Path) -> dict:
@@ -115,4 +117,4 @@ def load_scene(path: str | Path, library: dict, reseed: bool = False) -> SceneSp
         orientation = entry.get("orientation", [1.0, 0.0, 0.0, 0.0])
         objects.append(ObjectInstance(id=f"{otype.name}_{i}", type=otype, position=position, orientation=orientation))
 
-    return SceneSpec(name=path.stem, table=table, objects=objects, seed=seed)
+    return SceneSpec(name=path.stem, table=table, objects=objects, seed=seed, environment=raw.get("environment", "none"))

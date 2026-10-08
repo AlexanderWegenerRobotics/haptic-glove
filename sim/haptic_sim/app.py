@@ -10,7 +10,7 @@ from .hand import make_hand
 from .inputs import make_finger_source, make_pose_source
 from .loop import PhysicsLoop
 from .outputs import UnrealPublisher
-from .recorder import Recorder, SessionLog, timing_summary
+from .recorder import Recorder, SessionLog
 from .scene import build_model, describe_scene, write_scene_description
 from .session import CommandQueue, Session, start_terminal_commands, start_udp_commands
 from .tracking import make_tracking
@@ -115,7 +115,8 @@ def run_episode(cfg: dict, library: dict, commands: CommandQueue, session: Sessi
         print(f"unreal stream: {u['host']}:{u['state_port']} at {u['rate']} Hz, scene on :{u['scene_port']}")
         publisher.start()
 
-    recorder = Recorder(session_log.directory, cfg["recording"]["enabled"])
+    recorder = Recorder(session_log, stem, description["scene_id"], {"config": cfg, "scene": description},
+                        cfg["recording"]["enabled"])
     pose_source = make_pose_source(cfg, tracking)
     session.reset()
 
@@ -137,14 +138,7 @@ def run_episode(cfg: dict, library: dict, commands: CommandQueue, session: Sessi
     if publisher:
         publisher.stop()
     print(f"stopped ({loop.exit_reason})")
-
-    rows = recorder.data()
-    if len(rows):
-        print(timing_summary(rows[:, 1], rows[:, 2], model.opt.timestep))
-    log_path = recorder.save({"config": cfg, "scene": description}, stem)
-    session_log.add_scene(stem, description["scene_id"], rows)
-    if log_path:
-        print(f"log: {log_path}")
+    recorder.end_segment(loop.exit_reason)
     return loop.exit_reason, loop.exit_args
 
 
@@ -178,3 +172,4 @@ def main(argv=None) -> None:
     finally:
         if tracking:
             tracking.stop()
+        session_log.close()

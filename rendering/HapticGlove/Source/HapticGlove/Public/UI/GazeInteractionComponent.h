@@ -70,4 +70,5 @@ private:
 	TWeakPtr<SWidget> DwellTarget;
 	float DwellElapsed = 0.0f;
 	bool bFired = false;
+	bool bLoggedSource = false;
 };
