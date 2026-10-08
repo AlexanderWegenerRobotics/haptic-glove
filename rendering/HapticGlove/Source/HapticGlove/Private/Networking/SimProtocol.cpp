@@ -4,6 +4,11 @@
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
 
+#if PLATFORM_WINDOWS
+#include "Windows/WindowsHWrapper.h"
+extern "C" __declspec(dllimport) void __stdcall GetSystemTimePreciseAsFileTime(LPFILETIME SystemTimeAsFileTime);
+#endif
+
 namespace
 {
 	const uint8 StateMagic[4] = {'H', 'G', 'S', 'T'};
@@ -99,7 +104,14 @@ FQuat SimProtocol::ToUnreal(double W, double X, double Y, double Z)
 
 double SimProtocol::UnixNow()
 {
+#if PLATFORM_WINDOWS
+	FILETIME Now;
+	GetSystemTimePreciseAsFileTime(&Now);
+	const uint64 Ticks = (static_cast<uint64>(Now.dwHighDateTime) << 32) | Now.dwLowDateTime;
+	return static_cast<double>(Ticks) * 1.0e-7 - 11644473600.0;
+#else
 	return (FDateTime::UtcNow() - FDateTime(1970, 1, 1)).GetTotalSeconds();
+#endif
 }
 
 bool SimProtocol::ParseState(const uint8* Data, int32 Size, FSimState& Out)

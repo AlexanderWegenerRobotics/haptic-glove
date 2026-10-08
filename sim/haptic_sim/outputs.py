@@ -1,6 +1,7 @@
 import json
 import socket
 import struct
+import sys
 import threading
 import time
 
@@ -23,6 +24,20 @@ GEOM_TYPES = {mujoco.mjtGeom.mjGEOM_SPHERE: "sphere", mujoco.mjtGeom.mjGEOM_CAPS
               mujoco.mjtGeom.mjGEOM_ELLIPSOID: "ellipsoid", mujoco.mjtGeom.mjGEOM_CYLINDER: "cylinder",
               mujoco.mjtGeom.mjGEOM_BOX: "box"}
 HEADER = struct.Struct("<4sHBBIdd8s")
+
+if sys.platform == "win32":
+    import ctypes
+
+    _precise_time = ctypes.windll.kernel32.GetSystemTimePreciseAsFileTime
+    _precise_time.argtypes = [ctypes.POINTER(ctypes.c_uint64)]
+    _precise_time.restype = None
+
+    def unix_now() -> float:
+        ticks = ctypes.c_uint64()
+        _precise_time(ctypes.byref(ticks))
+        return ticks.value * 1e-7 - 11644473600.0
+else:
+    unix_now = time.time
 STATUS = struct.Struct("<IIf")
 POSE = struct.Struct("<7f")
 COUNT = struct.Struct("<H")
@@ -107,7 +122,7 @@ class UnrealPublisher:
         '''Pack the current state into one packet; call while holding the sim lock.'''
         self.seq += 1
         parts = [HEADER.pack(STATE_MAGIC, PROTOCOL_VERSION, self.hand_type, flags, self.seq, data.time,
-                             time.time(), self.scene_id),
+                             unix_now(), self.scene_id),
                  STATUS.pack(trial, command_seq, countdown),
                  POSE.pack(*data.xpos[self.root_body], *data.xquat[self.root_body]),
                  POSE.pack(*data.xpos[self.ghost_body], *data.xquat[self.ghost_body])]

@@ -10,7 +10,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from haptic_sim.outputs import SCENE_MAGIC, decode_state
+from haptic_sim.outputs import SCENE_MAGIC, decode_state, unix_now
 
 
 def open_socket(port: int) -> socket.socket:
@@ -55,7 +55,7 @@ def main() -> None:
                 if last_seq is not None and last["seq"] > last_seq + 1:
                     lost += last["seq"] - last_seq - 1
                 last_seq = last["seq"]
-                latencies.append(time.time() - last["send_time"])
+                latencies.append(unix_now() - last["send_time"])
                 count += 1
             now = time.time()
             if now - window >= 1.0:
