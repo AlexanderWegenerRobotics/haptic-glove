@@ -1,0 +1,876 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Glove Pose Estimator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<script>
+window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg-full.js" async></script>
+<style>
+/* Layout: single reading column (~72ch) with figures allowed to run wider; engineering-notebook feel, draw.io style sketches */
+:root {
+  --paper: #F4F7F6;
+  --panel: #FFFFFF;
+  --ink: #17232B;
+  --muted: #5A6971;
+  --line: #C8D2D5;
+  --accent: #1F5F8B;
+  --tracker: #6A4FB3;
+  --imu: #0C7D86;
+  --cable: #B8700A;
+  --warn: #B23B3B;
+  --band: rgba(31, 95, 139, 0.16);
+  --code: #EAF0EF;
+  --f-display: "IBM Plex Sans Condensed", "Arial Narrow", sans-serif;
+  --f-body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #111719; --panel: #172024; --ink: #E2E9EB; --muted: #94A4AB; --line: #2D3B41;
+    --accent: #72B4E2; --tracker: #A891EA; --imu: #4EC3CB; --cable: #E4A84C; --warn: #E67C7C;
+    --band: rgba(114, 180, 226, 0.18); --code: #1C272C; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #111719; --panel: #172024; --ink: #E2E9EB; --muted: #94A4AB; --line: #2D3B41;
+  --accent: #72B4E2; --tracker: #A891EA; --imu: #4EC3CB; --cable: #E4A84C; --warn: #E67C7C;
+  --band: rgba(114, 180, 226, 0.18); --code: #1C272C; color-scheme: dark;
+}
+body { background: var(--paper); color: var(--ink); font-family: var(--f-body); font-size: 16px; line-height: 1.6; }
+.wrap { max-width: 980px; margin: 0 auto; padding-inline: 20px; padding-block: 40px 80px; }
+.col { max-width: 72ch; }
+header .eyebrow { font-family: var(--f-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--f-display); font-weight: 600; font-size: clamp(32px, 5vw, 46px); line-height: 1.1; margin: 8px 0 12px; text-wrap: balance; }
+h2 { font-family: var(--f-display); font-weight: 600; font-size: 27px; line-height: 1.2; margin: 64px 0 12px; text-wrap: balance; display: flex; gap: 12px; align-items: baseline; }
+h2 .no { font-family: var(--f-mono); font-size: 14px; font-weight: 500; color: var(--accent); }
+h3 { font-family: var(--f-display); font-weight: 600; font-size: 20px; margin: 32px 0 8px; }
+p { margin: 0 0 14px; }
+.lede { font-size: 18px; color: var(--ink); }
+.muted { color: var(--muted); }
+a { color: var(--accent); }
+code, .mono { font-family: var(--f-mono); font-size: 0.9em; }
+figure { margin: 24px 0; }
+figcaption { font-size: 13.5px; color: var(--muted); margin-top: 8px; max-width: 72ch; }
+.scroll { overflow-x: auto; }
+.sheet { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 16px; }
+nav.toc { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 14px; margin: 20px 0 0; padding: 12px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+nav.toc a { text-decoration: none; color: var(--ink); }
+nav.toc a span { font-family: var(--f-mono); color: var(--accent); margin-right: 4px; font-size: 12px; }
+table { border-collapse: collapse; font-size: 14.5px; width: 100%; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-weight: 600; font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+td.num { font-variant-numeric: tabular-nums; font-family: var(--f-mono); font-size: 13px; white-space: nowrap; }
+.sensors { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin: 20px 0; }
+.sensor { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 16px 18px; min-width: 0; }
+.sensor h3 { margin: 0 0 4px; display: flex; align-items: center; gap: 8px; }
+.sensor h3 i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.sensor dl { margin: 10px 0 0; display: grid; grid-template-columns: 1fr; gap: 6px; font-size: 14.5px; }
+.sensor dt { font-family: var(--f-mono); font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-top: 6px; }
+.sensor dd { margin: 0; min-width: 0; overflow-x: auto; }
+.chip { display: inline-block; font-family: var(--f-mono); font-size: 11.5px; padding: 1px 7px; border-radius: 10px; border: 1px solid currentColor; }
+.yes { color: var(--imu); } .no-obs { color: var(--warn); } .part { color: var(--cable); }
+pre { background: var(--code); border-radius: 6px; padding: 14px 16px; overflow-x: auto; font-family: var(--f-mono); font-size: 12.8px; line-height: 1.5; }
+.mathbox { overflow-x: auto; overflow-y: hidden; padding: 2px 0; }
+.note { border-left: 3px solid var(--cable); padding: 6px 0 6px 14px; margin: 18px 0; font-size: 15px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: center; margin: 4px 0 14px; font-size: 14px; }
+.controls label { display: inline-flex; align-items: center; gap: 8px; }
+.controls input[type=range] { width: 150px; accent-color: var(--accent); }
+.controls input[type=checkbox] { accent-color: var(--accent); width: 16px; height: 16px; }
+.controls select, .controls button { font: inherit; font-size: 14px; padding: 4px 10px; border: 1px solid var(--line); border-radius: 5px; background: var(--paper); color: var(--ink); }
+.controls button { cursor: pointer; }
+.controls button:hover { border-color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.val { font-family: var(--f-mono); font-size: 12.5px; color: var(--accent); min-width: 5ch; display: inline-block; font-variant-numeric: tabular-nums; }
+.readout { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px 20px; margin-top: 12px; font-size: 14px; }
+.readout div { min-width: 0; }
+.readout b { display: block; font-family: var(--f-mono); font-weight: 500; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.readout span { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--muted); margin-top: 8px; }
+.legend i { display: inline-block; width: 18px; height: 0; border-top: 2px solid; vertical-align: middle; margin-right: 6px; }
+canvas { display: block; width: 100%; }
+ol.steps { padding-left: 22px; } ol.steps li { margin-bottom: 8px; }
+.refs li { margin-bottom: 10px; font-size: 14.5px; }
+.refs .why { color: var(--muted); display: block; font-size: 13.5px; }
+svg text { font-family: var(--f-body); }
+svg .t { fill: var(--ink); font-size: 13px; }
+svg .ts { fill: var(--muted); font-size: 11px; }
+svg .tm { fill: var(--ink); font-family: var(--f-mono); font-size: 11.5px; }
+svg .box { fill: var(--panel); stroke: var(--ink); stroke-width: 1.3; }
+svg .edge { fill: none; stroke: var(--ink); stroke-width: 1.3; }
+svg .thin { fill: none; stroke: var(--muted); stroke-width: 1; }
+svg .dash { stroke-dasharray: 5 4; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+@media (max-width: 520px) { h2 { font-size: 23px; } .controls input[type=range] { width: 120px; } }
+</style>
+
+<div class="wrap">
+<header class="col">
+  <div class="eyebrow">haptic-glove · finger sensing · planning note · Oct 2026</div>
+  <h1>Glove Pose Estimator</h1>
+  <p class="lede">How we get from raw tracker, IMU and servo readings to joint angles and fingertip poses of the operator's hand. One small EKF per finger, built on a hinge-chain hand model, with the Vive tracker giving the palm orientation.</p>
+</header>
+
+<nav class="toc" aria-label="Sections">
+  <a href="#overview"><span>1</span>Overview</a>
+  <a href="#model"><span>2</span>Hand model</a>
+  <a href="#sensors"><span>3</span>Sensors</a>
+  <a href="#fusion"><span>4</span>Fusion</a>
+  <a href="#ekf"><span>5</span>EKF</a>
+  <a href="#demo"><span>6</span>Live filter</a>
+  <a href="#thumb"><span>7</span>Thumb</a>
+  <a href="#calib"><span>8</span>Calibration</a>
+  <a href="#limits"><span>9</span>Limits</a>
+  <a href="#refs"><span>10</span>Literature</a>
+</nav>
+
+<section id="overview">
+<h2><span class="no">01</span>Overview</h2>
+<div class="col">
+<p>Four sensor streams come in on two clocks. The tracker pose arrives on the PC through SteamVR; the hand IMU, finger IMUs and servo readings arrive from the ESP32 in the glove state frame. A small palm filter turns tracker plus hand IMU into a clean 500 Hz palm orientation. With that orientation known, each finger becomes an independent problem, so each gets its own EKF with only 9 states.</p>
+</div>
+<figure>
+<div class="sheet scroll">
+<svg viewBox="0 0 930 330" width="930" height="330" role="img" aria-label="Estimator pipeline from sensors through palm filter, preprocessing and finger EKFs to forward kinematics and retargeting">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--ink)"/></marker>
+  </defs>
+  <rect class="box" x="10" y="20" width="210" height="52" rx="4" style="stroke:var(--tracker)"/>
+  <text class="t" x="22" y="42">Vive Tracker 3.0</text><text class="ts" x="22" y="60">pose in SteamVR frame · PC clock</text>
+  <rect class="box" x="10" y="95" width="210" height="52" rx="4" style="stroke:var(--imu)"/>
+  <text class="t" x="22" y="117">Hand IMU</text><text class="ts" x="22" y="135">ω, f · ESP clock · 500 Hz</text>
+  <rect class="box" x="10" y="170" width="210" height="52" rx="4" style="stroke:var(--imu)"/>
+  <text class="t" x="22" y="192">Finger IMUs (index, middle, thumb)</text><text class="ts" x="22" y="210">ω, f · on proximal segment</text>
+  <rect class="box" x="10" y="245" width="210" height="52" rx="4" style="stroke:var(--cable)"/>
+  <text class="t" x="22" y="267">Servos ×3</text><text class="ts" x="22" y="285">position ticks, present current</text>
+
+  <rect class="box" x="290" y="50" width="200" height="62" rx="4"/>
+  <text class="t" x="302" y="73">Palm filter</text><text class="ts" x="302" y="91">tracker + hand gyro, time offset</text><text class="ts" x="302" y="105">→ R_WH, p_WH at 500 Hz</text>
+  <rect class="box" x="290" y="185" width="200" height="72" rx="4"/>
+  <text class="t" x="302" y="208">Preprocess</text><text class="ts" x="302" y="226">scale, offsets, mount rotation</text><text class="ts" x="302" y="240">ω_rel = ω_finger − ω_hand</text><text class="ts" x="302" y="254">Δl from ticks, stretch τ/k</text>
+
+  <rect class="box" x="550" y="110" width="170" height="96" rx="4" style="stroke-width:2"/>
+  <text class="t" x="562" y="134" style="font-weight:600">Finger EKFs</text><text class="ts" x="562" y="152">one per finger</text><text class="ts" x="562" y="168">x = [q, q̇, b_g]</text><text class="ts" x="562" y="184">joint limits as clamp</text>
+
+  <rect class="box" x="770" y="70" width="150" height="52" rx="4"/>
+  <text class="t" x="782" y="92">Hand FK</text><text class="ts" x="782" y="110">tip poses in W</text>
+  <rect class="box" x="770" y="200" width="150" height="52" rx="4"/>
+  <text class="t" x="782" y="222">Retargeting / sim</text><text class="ts" x="782" y="240">gripper or Allegro</text>
+
+  <path class="edge" d="M220,46 H255 V70 H288" marker-end="url(#ar)"/>
+  <path class="edge" d="M220,113 H255 V92 H288" marker-end="url(#ar)"/>
+  <path class="edge" d="M220,128 H245 V205 H288" marker-end="url(#ar)"/>
+  <path class="edge" d="M220,196 H230 V222 H288" marker-end="url(#ar)"/>
+  <path class="edge" d="M220,271 H255 V240 H288" marker-end="url(#ar)"/>
+  <path class="edge" d="M490,81 H520 V135 H548" marker-end="url(#ar)"/>
+  <text class="ts" x="496" y="74">R_WH</text>
+  <path class="edge" d="M490,221 H520 V180 H548" marker-end="url(#ar)"/>
+  <text class="ts" x="496" y="236">ω_rel, f, Δl</text>
+  <path class="edge" d="M720,140 H745 V96 H768" marker-end="url(#ar)"/>
+  <text class="ts" x="724" y="132">q, q̇, Σ</text>
+  <path class="thin dash" d="M490,62 H760 V75" marker-end="url(#ar)"/>
+  <text class="ts" x="640" y="56">T_WH</text>
+  <path class="edge" d="M845,122 V198" marker-end="url(#ar)"/>
+</svg>
+</div>
+<figcaption>Fig. 1. Data flow. Solid: per-tick data. Dashed: the palm pose also goes straight to forward kinematics to place the fingertips in the world.</figcaption>
+</figure>
+<div class="col">
+<p><b>What comes out:</b> joint angles and rates for thumb, index and middle, their covariance, and fingertip positions and pad normals in the palm frame and in the sim world. The covariance is useful downstream. When spread is unobservable (palm down, see section 5), its uncertainty grows, and retargeting can fall back to a neutral spread instead of trusting a drifting value.</p>
+</div>
+</section>
+
+<section id="model">
+<h2><span class="no">02</span>Hand kinematic model</h2>
+<div class="col">
+<h3>Frames</h3>
+<table>
+<tr><th>Frame</th><th>Meaning</th></tr>
+<tr><td class="num">W</td><td>Sim world, z up. Same as in <code>tracking.py</code>.</td></tr>
+<tr><td class="num">V</td><td>SteamVR standing frame. Mapped to W by the existing calibration \(T_{WV}\).</td></tr>
+<tr><td class="num">T</td><td>Vive tracker body.</td></tr>
+<tr><td class="num">H</td><td>Palm. x along the middle metacarpal toward the fingers, y toward the thumb (right hand), z out of the back of the hand. \(T_{TH}\) is the wrist offset already in config.</td></tr>
+<tr><td class="num">S<sub>h</sub></td><td>Hand IMU, rigidly on the palm, constant \(R_{HS_h}\).</td></tr>
+<tr><td class="num">P<sub>i</sub></td><td>Proximal segment of finger i, x along the bone, z dorsal.</td></tr>
+<tr><td class="num">S<sub>i</sub></td><td>Finger IMU on P<sub>i</sub>, constant but unknown mount rotation \(R_{PS}\).</td></tr>
+</table>
+</div>
+
+<figure>
+<div class="sheet scroll">
+<svg viewBox="0 0 640 320" width="640" height="320" role="img" aria-label="Top view of the right hand, palm down, with palm frame H, tracker T, hand IMU and finger IMUs, plus the world frame W">
+  <defs>
+    <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/></marker>
+    <marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--muted)"/></marker>
+  </defs>
+  <rect x="150" y="105" width="190" height="150" rx="22" fill="var(--panel)" stroke="var(--ink)" stroke-width="1.4"/>
+  <path d="M110,160 H150 M110,215 H150" stroke="var(--ink)" stroke-width="1.4"/>
+  <text class="ts" x="62" y="192">wrist</text>
+  <g stroke="var(--ink)" stroke-width="12" stroke-linecap="round" fill="none" opacity="0.9">
+    <path d="M340,125 L400,122 L436,121 L462,121" stroke="var(--line)"/>
+    <path d="M340,163 L408,163 L446,163 L474,163" stroke="var(--line)"/>
+  </g>
+  <g stroke="var(--line)" stroke-width="11" stroke-linecap="round" fill="none" stroke-dasharray="2 5">
+    <path d="M340,198 L398,201 L430,203 L452,204"/>
+    <path d="M335,232 L380,238 L405,242 L422,244"/>
+  </g>
+  <g stroke="var(--line)" stroke-width="12" stroke-linecap="round" fill="none">
+    <path d="M190,105 L232,62 L262,40 L282,28"/>
+  </g>
+  <g fill="var(--panel)" stroke="var(--ink)" stroke-width="1.2">
+    <circle cx="340" cy="125" r="5"/><circle cx="400" cy="122" r="4"/><circle cx="436" cy="121" r="4"/>
+    <circle cx="340" cy="163" r="5"/><circle cx="408" cy="163" r="4"/><circle cx="446" cy="163" r="4"/>
+    <circle cx="190" cy="105" r="5"/><circle cx="232" cy="62" r="4"/><circle cx="262" cy="40" r="4"/>
+  </g>
+  <g fill="var(--imu)">
+    <rect x="362" y="117" width="18" height="10" rx="2"/>
+    <rect x="367" y="158" width="18" height="10" rx="2"/>
+    <rect x="240" y="43" width="18" height="10" rx="2" transform="rotate(-38 249 48)"/>
+    <rect x="168" y="200" width="22" height="14" rx="2"/>
+  </g>
+  <text class="ts" x="385" y="108" style="fill:var(--imu)">S_index</text>
+  <text class="ts" x="390" y="185" style="fill:var(--imu)">S_middle</text>
+  <text class="ts" x="268" y="62" style="fill:var(--imu)">S_thumb</text>
+  <text class="ts" x="160" y="230" style="fill:var(--imu)">S_h</text>
+  <rect x="226" y="160" width="46" height="40" rx="6" fill="none" stroke="var(--tracker)" stroke-width="1.8"/>
+  <text class="ts" x="236" y="215" style="fill:var(--tracker)">tracker T</text>
+  <path d="M249,180 H310" stroke="var(--accent)" stroke-width="1.6" marker-end="url(#ar2)"/>
+  <path d="M249,180 V128" stroke="var(--accent)" stroke-width="1.6" marker-end="url(#ar2)"/>
+  <circle cx="249" cy="180" r="5" fill="var(--panel)" stroke="var(--accent)" stroke-width="1.6"/><circle cx="249" cy="180" r="1.6" fill="var(--accent)"/>
+  <text class="tm" x="313" y="184" style="fill:var(--accent)">x_H</text>
+  <text class="tm" x="253" y="126" style="fill:var(--accent)">y_H</text>
+  <text class="tm" x="220" y="176" style="fill:var(--accent)">z_H</text>
+  <text class="ts" x="470" y="125">index · 3 DoF</text>
+  <text class="ts" x="482" y="167">middle · 3 DoF</text>
+  <text class="ts" x="460" y="208">ring, pinky: not measured</text>
+  <text class="ts" x="290" y="24">thumb · 4 DoF</text>
+  <path d="M560,290 H610" stroke="var(--muted)" stroke-width="1.4" marker-end="url(#ar3)"/>
+  <path d="M560,290 V245" stroke="var(--muted)" stroke-width="1.4" marker-end="url(#ar3)"/>
+  <circle cx="560" cy="290" r="4.5" fill="var(--panel)" stroke="var(--muted)" stroke-width="1.4"/><circle cx="560" cy="290" r="1.4" fill="var(--muted)"/>
+  <text class="ts" x="548" y="240">W (z up, out of page here)</text>
+  <text class="ts" x="20" y="300">Right hand, palm down, seen from above. z_H points at you.</text>
+</svg>
+</div>
+<figcaption>Fig. 2. Frames on the hand. Tracker and hand IMU on the back of the palm, finger IMUs on the proximal segments next to the knuckle.</figcaption>
+</figure>
+
+<div class="col">
+<h3>Finger chain (index, middle)</h3>
+<p>Each finger is a planar chain hanging off a 2-DoF knuckle. The knuckle has spread \(\alpha\) about \(z_H\) and flexion \(\theta_1\) about the new y axis. Flexion is positive when the finger curls toward the palm.</p>
+<div class="mathbox">\[ T_{HP}(\alpha,\theta_1) = \mathrm{Trans}(m_i)\,R_z(\alpha)\,R_y(\theta_1), \qquad T_{P,\mathrm{tip}} = \mathrm{Trans}(L_1\hat x)\,R_y(\theta_2)\,\mathrm{Trans}(L_2\hat x)\,R_y(\theta_3)\,\mathrm{Trans}(L_3\hat x) \]</div>
+<p>Here \(m_i\) is the knuckle position in the palm frame and \(L_1, L_2, L_3\) are the segment lengths. The DIP joint is not independent in normal motion; it follows the PIP joint closely enough that the usual model is</p>
+<div class="mathbox">\[ \theta_3 \approx c\,\theta_2, \qquad c \approx 0.67 \]</div>
+<p>So the estimated joint vector per finger is \(q = [\alpha, \theta_1, \theta_2]\) and the fingertip is \(p^H_\mathrm{tip} = \mathrm{FK}(q)\), \(p^W_\mathrm{tip} = T_{WH}\,p^H_\mathrm{tip}\). The pad normal is the \(-z\) axis of the distal frame.</p>
+<table>
+<tr><th>Joint</th><th>Symbol</th><th>Typical range</th><th>Source</th></tr>
+<tr><td>MCP spread</td><td class="num">α</td><td class="num">−20° … 20°</td><td>finger IMU (pose dependent)</td></tr>
+<tr><td>MCP flexion</td><td class="num">θ₁</td><td class="num">−20° … 90°</td><td>finger IMU</td></tr>
+<tr><td>PIP flexion</td><td class="num">θ₂</td><td class="num">0° … 110°</td><td>cable, given θ₁</td></tr>
+<tr><td>DIP flexion</td><td class="num">θ₃</td><td class="num">= 0.67 θ₂</td><td>coupling</td></tr>
+</table>
+<p class="muted" style="font-size:14px;margin-top:8px">Ranges are rough starting values; tune them per person in calibration.</p>
+</div>
+
+<h3 class="col">Try it: one finger, side view</h3>
+<figure class="sheet">
+<div class="controls">
+  <label for="s-t1">MCP θ₁ <input type="range" id="s-t1" min="-20" max="90" value="35"><span class="val" id="v-t1"></span></label>
+  <label for="s-t2">PIP θ₂ <input type="range" id="s-t2" min="0" max="110" value="50"><span class="val" id="v-t2"></span></label>
+</div>
+<div class="scroll"><svg id="finger" viewBox="0 0 620 300" width="620" height="300" role="img" aria-label="Interactive side view of one finger with cable and IMU"></svg></div>
+<div class="readout">
+  <div><b>DIP θ₃ (coupled)</b><span id="r-t3"></span></div>
+  <div><b>Fingertip (x, z) in mm</b><span id="r-tip"></span></div>
+  <div><b>Accel in S, palm down</b><span id="r-acc"></span></div>
+  <div><b>θ₁ from gravity</b><span id="r-t1"></span></div>
+  <div><b>Cable Δl: geometry / linear model</b><span id="r-dl"></span></div>
+  <div><b>θ₂ from cable, given θ₁</b><span id="r-t2"></span></div>
+</div>
+<figcaption>Fig. 3. The IMU on the proximal segment only rotates with θ₁, so gravity gives θ₁ directly (palm down). The dorsal cable lengthens with every joint. Once θ₁ is known, the cable leaves only θ₂. The two Δl values drift apart at large angles: the real routing is not linear in the angles, which is why calibration should fit a curve, not a single gain.</figcaption>
+</figure>
+</section>
+
+<section id="sensors">
+<h2><span class="no">03</span>Sensors: from raw value to physical quantity</h2>
+<div class="col">
+<p>For each sensor: what the hardware gives us, how we convert it, and the measurement model \(h(\cdot)\) that predicts the reading from the state. That last part is what the EKF uses.</p>
+</div>
+<div class="sensors">
+  <div class="sensor">
+    <h3><i style="background:var(--tracker)"></i>Vive tracker</h3>
+    <dl>
+      <dt>Raw</dt><dd>OpenVR <code>mDeviceToAbsoluteTracking</code>, a 3×4 pose of the tracker in the SteamVR frame V. SteamVR already fuses the tracker's own IMU with the lighthouse sweeps.</dd>
+      <dt>Physical value</dt><dd>\(T_{WT} = T_{WV}\,T_{VT}\), then the palm \(T_{WH} = T_{WT}\,T_{TH}\). Both transforms already exist in <code>tracking.py</code> and the calibration file.</dd>
+      <dt>Tells us</dt><dd>Palm position and full orientation in W, without drift.</dd>
+      <dt>Errors</dt><dd>Latency of a few ms on the PC clock, jumps on occlusion, small jitter. With one base station, occlusion by the other hand happens.</dd>
+    </dl>
+  </div>
+  <div class="sensor">
+    <h3><i style="background:var(--imu)"></i>Hand IMU</h3>
+    <dl>
+      <dt>Raw</dt><dd>int16 gyro and accel counts per axis, read by the ESP at 500 Hz, timestamped on the ESP clock.</dd>
+      <dt>Physical value</dt><dd>\(\omega = \frac{\text{raw}}{s_g}\cdot\frac{\pi}{180} - b_g\), \(f = \frac{\text{raw}}{s_a}\,g - b_a\). At ±2000 °/s a typical chip has \(s_g \approx 16.4\) LSB per °/s; at ±8 g, \(s_a \approx 4096\) LSB per g. Check the datasheet of the chip we pick.</dd>
+      <dt>Tells us</dt><dd>Palm angular rate on the same clock as the finger IMUs. That makes the relative finger rate clean, and cross-correlating it with the tracker's rate gives the PC–ESP time offset.</dd>
+      <dt>Errors</dt><dd>Gyro bias (temperature dependent), noise. Its own orientation drifts, but the tracker corrects that in the palm filter.</dd>
+    </dl>
+  </div>
+  <div class="sensor">
+    <h3><i style="background:var(--imu)"></i>Finger IMUs</h3>
+    <dl>
+      <dt>Raw</dt><dd>Same as the hand IMU, one per finger on the proximal segment.</dd>
+      <dt>Physical value</dt><dd>Gyro: relative rate \(\omega_{rel} = \omega_{S} - R_{SS_h}\,\omega_{S_h}\), with \(R_{SS_h}\) from the current state. Accel: specific force \(f_S\), which at low acceleration is gravity seen in S.</dd>
+      <dt>Model</dt><dd>\(h_\omega = R_{PS}^\top\big(R_y(\theta_1)^\top\hat z\,\dot\alpha + \hat y\,\dot\theta_1\big) + b\)<br>\(h_f = R_{PS}^\top R_y(\theta_1)^\top R_z(\alpha)^\top R_{WH}^\top\,[0,0,g]^\top\)</dd>
+      <dt>Tells us</dt><dd>α̇ and θ̇₁ always; α and θ₁ in absolute terms only through gravity, which depends on how the palm is held.</dd>
+      <dt>Errors</dt><dd>Gyro bias, accel corrupted by motion, mount misalignment, skin and strap motion.</dd>
+    </dl>
+  </div>
+  <div class="sensor">
+    <h3><i style="background:var(--cable)"></i>Servo / cable</h3>
+    <dl>
+      <dt>Raw</dt><dd>XL330 present position (4096 ticks per revolution, 0.088° per tick) and present current.</dd>
+      <dt>Physical value</dt><dd>\(\Delta l = r_s\,\frac{2\pi}{4096}(n - n_0)\) with spool radius \(r_s\). Torque from current via a calibrated constant, \(\tau = k_t\,i\).</dd>
+      <dt>Model</dt><dd>\(h_l = r_1\theta_1 + (r_2 + c\,r_3)\,\theta_2 + \tau/k_c\)<br>\(r_j\): effective moment arm at joint j. \(k_c\): tendon + strap stiffness, from the fingertip force test.</dd>
+      <dt>Tells us</dt><dd>A weighted sum of flexion, in every hand pose, without drift.</dd>
+      <dt>Errors</dt><dd>Stretch under load (handled by \(\tau/k_c\)), strap slip, slack when the servo doesn't keep the tendon taut.</dd>
+    </dl>
+  </div>
+</div>
+
+<div class="col">
+<h3>Who sees what</h3>
+<div class="scroll">
+<table>
+<tr><th>Quantity</th><th>Gyro (relative)</th><th>Accel, palm down</th><th>Accel, handshake</th><th>Cable</th></tr>
+<tr><td>α (spread)</td><td><span class="chip part">rate</span></td><td><span class="chip no-obs">no</span></td><td><span class="chip yes">yes</span></td><td><span class="chip no-obs">no</span></td></tr>
+<tr><td>θ₁ (MCP)</td><td><span class="chip part">rate</span></td><td><span class="chip yes">yes</span></td><td><span class="chip no-obs">no</span></td><td><span class="chip part">in sum</span></td></tr>
+<tr><td>θ₂ (PIP)</td><td><span class="chip no-obs">no</span></td><td><span class="chip no-obs">no</span></td><td><span class="chip no-obs">no</span></td><td><span class="chip part">in sum</span></td></tr>
+<tr><td>gyro bias</td><td colspan="4">Off-hinge axis: always (hinge constraint). On-hinge axes: through accel or cable fixing the absolute angle, or while the hand rests.</td></tr>
+</table>
+</div>
+<p style="margin-top:12px">Read the table column by column and it is clear why no single sensor is enough. In the handshake pose the cable takes over θ₁ from gravity. Palm down, nothing sees α except the integrated gyro.</p>
+</div>
+</section>
+
+<section id="fusion">
+<h2><span class="no">04</span>How the fusion is split</h2>
+<div class="col">
+<p><b>Palm filter.</b> Propagate \(R_{WH}\) with the hand gyro at 500 Hz and correct it toward the tracker pose, delayed by the estimated time offset. A complementary filter or a small error-state filter on SO(3) both work. The tracker pose alone would also do for a first version, since SteamVR already fuses its IMU. The point of the palm filter is having \(R_{WH}\) on the ESP clock, so the accel model of every finger uses a palm orientation from the same instant.</p>
+<p><b>Finger EKFs.</b> Given \(R_{WH}\), the fingers don't share any unknowns, so the joint estimation splits into one filter per finger. Each one is 9 states, and the measurement models are a handful of sines and cosines. That is cheap enough to run in the Python sim loop at 500 Hz; the ESP only forwards raw IMU data in the state frame (about 24 kB/s for four IMUs).</p>
+<p><b>Why an EKF.</b> The measurement models are nonlinear (rotations), but only mildly over one 2 ms step, and the state is small. A complementary filter per joint would be simpler but can't combine the cable sum with the IMU angle cleanly or estimate bias. A UKF or a sliding-window optimizer would also work; the EKF is the easiest to debug and the natural first choice.</p>
+</div>
+</section>
+
+<section id="ekf">
+<h2><span class="no">05</span>The finger EKF in detail</h2>
+<div class="col">
+<h3>State</h3>
+<div class="mathbox">\[ x = \big[\;\underbrace{\alpha,\;\theta_1,\;\theta_2}_{q}\;,\;\underbrace{\dot\alpha,\;\dot\theta_1,\;\dot\theta_2}_{\dot q}\;,\;\underbrace{b_x,\;b_y,\;b_z}_{b_g}\;\big]^\top \in \mathbb{R}^9 \]</div>
+<p>The gyro bias here is the bias of the relative rate. The hand IMU's own bias is folded in, which is fine since it is slow too.</p>
+
+<h3>Process model</h3>
+<p>Constant velocity for the joints, random walk for the bias. With step \(\Delta t = 2\) ms:</p>
+<div class="mathbox">\[ q_{k+1} = q_k + \Delta t\,\dot q_k,\qquad \dot q_{k+1} = \dot q_k + w_v,\qquad b_{k+1} = b_k + w_b \]</div>
+<div class="mathbox">\[ F = \begin{bmatrix} I_3 & \Delta t\,I_3 & 0\\ 0 & I_3 & 0 \\ 0 & 0 & I_3\end{bmatrix},\qquad Q = \mathrm{diag}\big(0_3,\;\sigma_v^2\Delta t\,I_3,\;\sigma_b^2\Delta t\,I_3\big) \]</div>
+<div class="mathbox">\[ \hat x^-_{k+1} = F\hat x_k,\qquad P^-_{k+1} = F P_k F^\top + Q \]</div>
+<p>\(\sigma_v\) is how fast joint velocity may change (angular acceleration noise). Fingers are quick, so it is large; the gyro then dominates the velocity.</p>
+
+<h3>Updates</h3>
+<p>All three measurements use the same standard step, with \(H = \partial h / \partial x\) at the predicted state:</p>
+<div class="mathbox">\[ y = z - h(\hat x^-),\quad S = H P^- H^\top + R,\quad K = P^- H^\top S^{-1},\quad \hat x = \hat x^- + K y,\quad P = (I - KH)P^-(I-KH)^\top + KRK^\top \]</div>
+
+<p><b>Gyro.</b> In the proximal frame, the relative rate is</p>
+<div class="mathbox">\[ \omega^P_{rel} = R_y(\theta_1)^\top\hat z\,\dot\alpha + \hat y\,\dot\theta_1 = \begin{bmatrix} -\sin\theta_1\,\dot\alpha \\ \dot\theta_1 \\ \cos\theta_1\,\dot\alpha\end{bmatrix}, \qquad h_\omega = R_{PS}^\top\,\omega^P_{rel} + b \]</div>
+<div class="mathbox">\[ \frac{\partial h_\omega}{\partial \theta_1} = R_{PS}^\top\begin{bmatrix}-\cos\theta_1\,\dot\alpha\\0\\-\sin\theta_1\,\dot\alpha\end{bmatrix},\quad \frac{\partial h_\omega}{\partial \dot\alpha} = R_{PS}^\top\begin{bmatrix}-\sin\theta_1\\0\\\cos\theta_1\end{bmatrix},\quad \frac{\partial h_\omega}{\partial \dot\theta_1} = R_{PS}^\top\,\hat y,\quad \frac{\partial h_\omega}{\partial b} = I_3 \]</div>
+<p>The finger can only turn in the plane spanned by the α̇ and θ̇₁ directions. The rate component orthogonal to both is pure bias, so that bias axis is always observable. This is what the earlier "hinge constraint" means in filter terms. θ̇₂ is not measured by this IMU at all.</p>
+
+<p><b>Cable.</b> Linear, so the Jacobian is exact:</p>
+<div class="mathbox">\[ h_l = r_1\theta_1 + (r_2 + c\,r_3)\,\theta_2, \qquad z_l = \Delta l - \tau/k_c, \qquad H_l = [\,0,\; r_1,\; r_2 + c\,r_3,\; 0,\dots,0\,] \]</div>
+<p>With the calibrated curve instead of constant moment arms, \(H_l\) is the local slope.</p>
+
+<p><b>Accelerometer.</b> Let \(g^H = R_{WH}^\top[0,0,g]^\top\) (from the palm filter) and \(w = R_z(\alpha)^\top g^H\). Then</p>
+<div class="mathbox">\[ h_f = R_{PS}^\top R_y(\theta_1)^\top w, \qquad \frac{\partial h_f}{\partial \theta_1} = R_{PS}^\top\big(h^P_f \times \hat y\big), \qquad \frac{\partial h_f}{\partial \alpha} = -R_{PS}^\top R_y(\theta_1)^\top\big(\hat z \times w\big) \]</div>
+<p>The second Jacobian is the observability result in one line. Palm down, \(g^H\) is parallel to \(\hat z\), so \(\hat z \times w = 0\) and the accelerometer has nothing to say about α. In the handshake pose \(g^H\) is parallel to \(\hat y\) and the first Jacobian vanishes instead.</p>
+
+<h3>Gating the accelerometer</h3>
+<p>The accel model assumes it measures only gravity. During fast motion it doesn't, so we skip the update when</p>
+<div class="mathbox">\[ \big|\,\|f\| - g\,\big| \gt \epsilon_f \quad(\epsilon_f \approx 0.5\text{–}1\ \text{m/s}^2) \qquad\text{or}\qquad y^\top S^{-1} y \gt \chi^2_{3,\,0.99} \approx 11.3 \]</div>
+<p>The norm check misses accelerations that happen to keep \(\|f\|\) near g, so the Mahalanobis gate catches the rest. An alternative is to inflate \(R_f\) with the measured \(\big|\|f\|-g\big|\) instead of a hard cut.</p>
+
+<h3>Joint limits</h3>
+<p>After each update, clip q to its limits and zero the velocity component pointing out of range. This is the crude version of constrained Kalman filtering; the cleaner versions project the estimate or truncate the Gaussian at the bound (Simon 2010). Clipping is enough to start and keeps spread from wandering off palm-down.</p>
+
+<h3>Stillness updates</h3>
+<p>When the relative gyro norm and accel variance stay small for about 0.3 s, add a pseudo-measurement \(\dot q = 0\) with small noise. Then the gyro reading equals the bias, which pins down the on-hinge bias axes too. Do this at startup and in every pause.</p>
+</div>
+
+<figure>
+<div class="sheet scroll">
+<svg viewBox="0 0 900 120" width="900" height="120" role="img" aria-label="Order of operations in one 2 ms filter tick">
+  <defs><marker id="ar4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--ink)"/></marker></defs>
+  <g>
+    <rect class="box" x="10" y="30" width="110" height="50" rx="4"/><text class="t" x="22" y="52">predict</text><text class="ts" x="22" y="69">F, Q, Δt = 2 ms</text>
+    <rect class="box" x="155" y="30" width="120" height="50" rx="4" style="stroke:var(--imu)"/><text class="t" x="167" y="52">gyro update</text><text class="ts" x="167" y="69">every tick</text>
+    <rect class="box" x="310" y="30" width="120" height="50" rx="4" style="stroke:var(--cable)"/><text class="t" x="322" y="52">cable update</text><text class="ts" x="322" y="69">every tick</text>
+    <rect class="box" x="465" y="30" width="130" height="50" rx="4" style="stroke:var(--imu)"/><text class="t" x="477" y="52">accel update</text><text class="ts" x="477" y="69">if gates pass</text>
+    <rect class="box" x="630" y="30" width="110" height="50" rx="4"/><text class="t" x="642" y="52">stillness?</text><text class="ts" x="642" y="69">q̇ = 0 update</text>
+    <rect class="box" x="775" y="30" width="115" height="50" rx="4"/><text class="t" x="787" y="52">clamp + FK</text><text class="ts" x="787" y="69">publish q, tips</text>
+  </g>
+  <path class="edge" d="M120,55 H153" marker-end="url(#ar4)"/>
+  <path class="edge" d="M275,55 H308" marker-end="url(#ar4)"/>
+  <path class="edge" d="M430,55 H463" marker-end="url(#ar4)"/>
+  <path class="edge" d="M595,55 H628" marker-end="url(#ar4)"/>
+  <path class="edge" d="M740,55 H773" marker-end="url(#ar4)"/>
+  <path class="thin dash" d="M832,80 V104 H65 V82" marker-end="url(#ar4)"/>
+  <text class="ts" x="380" y="117">next ESP state frame</text>
+</svg>
+</div>
+<figcaption>Fig. 4. One tick per glove state frame. Sequential updates are equivalent to one stacked update when the measurement noises are independent, and they let each sensor be gated on its own.</figcaption>
+</figure>
+
+<div class="col">
+<h3>Starting values</h3>
+<table>
+<tr><th>Parameter</th><th>Value</th><th>Note</th></tr>
+<tr><td>σ_v (joint accel noise)</td><td class="num">5–10 rad/s²·√s</td><td>larger = trusts gyro more for velocity</td></tr>
+<tr><td>σ_b (bias walk)</td><td class="num">1e-3 rad/s/√s</td><td>MEMS gyro, room temperature</td></tr>
+<tr><td>R_ω</td><td class="num">(0.01 rad/s)²</td><td>a bit above datasheet noise, covers skin vibration</td></tr>
+<tr><td>R_f</td><td class="num">(0.3 m/s²)²</td><td>well above sensor noise, covers small unmodeled accel</td></tr>
+<tr><td>R_l</td><td class="num">(0.1–0.3 mm)²</td><td>mostly strap and routing error, not the encoder</td></tr>
+<tr><td>P₀</td><td class="num">diag(0.3², 0.5², 0.05²)</td><td>angles, rates, biases</td></tr>
+</table>
+
+<h3>Code sketch</h3>
+<p>About the size of the real thing. NumPy, no allocation tricks needed at this state size.</p>
+</div>
+<pre>import numpy as np
+
+
+def rot_y(t):
+    """Rotation about y."""
+    c, s = np.cos(t), np.sin(t)
+    return np.array([[c, 0, s], [0, 1, 0], [-s, 0, c]])
+
+
+def rot_z(t):
+    """Rotation about z."""
+    c, s = np.cos(t), np.sin(t)
+    return np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]])
+
+
+class FingerEKF:
+    """EKF for one finger with state [alpha, th1, th2, dalpha, dth1, dth2, bx, by, bz]."""
+
+    def __init__(self, p):
+        """Set initial state, covariance, noise and finger parameters."""
+        self.x = np.zeros(9)
+        self.P = np.diag(p.p0)
+        self.q_vel, self.q_bias = p.q_vel, p.q_bias
+        self.R_PS = p.R_PS
+        self.r1, self.k2 = p.r1, p.r2 + p.c * p.r3
+        self.lo, self.hi = np.asarray(p.lower), np.asarray(p.upper)
+
+    def predict(self, dt):
+        """Propagate with a constant-velocity model."""
+        F = np.eye(9)
+        F[0:3, 3:6] = dt * np.eye(3)
+        Q = np.diag([0, 0, 0] + [self.q_vel * dt] * 3 + [self.q_bias * dt] * 3)
+        self.x = F @ self.x
+        self.P = F @ self.P @ F.T + Q
+
+    def update(self, z, h, H, R, gate=None):
+        """Joseph-form EKF update with optional Mahalanobis gate."""
+        y = z - h
+        S = H @ self.P @ H.T + R
+        if gate is not None and y @ np.linalg.solve(S, y) > gate:
+            return False
+        K = self.P @ H.T @ np.linalg.inv(S)
+        self.x = self.x + K @ y
+        A = np.eye(9) - K @ H
+        self.P = A @ self.P @ A.T + K @ R @ K.T
+        self.clamp()
+        return True
+
+    def gyro(self, w_rel, R):
+        """Update with the relative angular rate in the IMU frame."""
+        t1, da, dt1 = self.x[1], self.x[3], self.x[4]
+        s, c = np.sin(t1), np.cos(t1)
+        h = self.R_PS.T @ np.array([-s * da, dt1, c * da]) + self.x[6:9]
+        H = np.zeros((3, 9))
+        H[:, 1] = self.R_PS.T @ np.array([-c * da, 0, -s * da])
+        H[:, 3] = self.R_PS.T @ np.array([-s, 0, c])
+        H[:, 4] = self.R_PS.T @ np.array([0, 1, 0])
+        H[:, 6:9] = np.eye(3)
+        return self.update(w_rel, h, H, R)
+
+    def cable(self, dl, tau, k_c, R):
+        """Update with tendon length change corrected for stretch."""
+        H = np.zeros((1, 9))
+        H[0, 1], H[0, 2] = self.r1, self.k2
+        return self.update(np.array([dl - tau / k_c]), H @ self.x, H, R)
+
+    def accel(self, f, g_H, R, eps=0.6, gate=11.3):
+        """Update with the gravity direction when the specific force is close to g."""
+        if abs(np.linalg.norm(f) - 9.81) > eps:
+            return False
+        Ry = rot_y(self.x[1])
+        w = rot_z(self.x[0]).T @ g_H
+        h_P = Ry.T @ w
+        H = np.zeros((3, 9))
+        H[:, 0] = -Ry.T @ np.cross([0, 0, 1], w)
+        H[:, 1] = np.cross(h_P, [0, 1, 0])
+        return self.update(f, self.R_PS.T @ h_P, self.R_PS.T @ H, R, gate)
+
+    def still(self, R):
+        """Zero-velocity pseudo-measurement while the hand rests."""
+        H = np.zeros((3, 9))
+        H[:, 3:6] = np.eye(3)
+        return self.update(np.zeros(3), self.x[3:6], H, R)
+
+    def clamp(self):
+        """Clip joint angles to their limits and stop motion past them."""
+        for i in range(3):
+            if not self.lo[i] <= self.x[i] <= self.hi[i]:
+                self.x[i] = np.clip(self.x[i], self.lo[i], self.hi[i])
+                self.x[i + 3] = 0.0</pre>
+</section>
+
+<section id="demo">
+<h2><span class="no">06</span>Live filter: one finger</h2>
+<div class="col">
+<p>This runs the EKF above in your browser on a simulated index finger: 12 s of curling with a bit of spread, at 500 Hz. Truth is dashed, the estimate is solid, the shaded band is ±2σ from P. Turn sensors off and change how the palm is held to see the table from section 3 come alive.</p>
+</div>
+<figure class="sheet">
+<div class="controls">
+  <label for="d-gyro"><input type="checkbox" id="d-gyro" checked> gyro</label>
+  <label for="d-acc"><input type="checkbox" id="d-acc" checked> accel</label>
+  <label for="d-cable"><input type="checkbox" id="d-cable" checked> cable</label>
+  <label for="d-gate"><input type="checkbox" id="d-gate" checked> accel gate</label>
+  <label for="d-shake"><input type="checkbox" id="d-shake" checked> fast hand motion 5–7 s</label>
+</div>
+<div class="controls">
+  <label for="d-pose">palm <select id="d-pose">
+    <option value="down">down (roll 0°)</option>
+    <option value="side">handshake (roll 90°)</option>
+    <option value="mid">tilted (roll 45°)</option>
+    <option value="sweep">rolls 0° → 90° during run</option>
+  </select></label>
+  <label for="d-bias">gyro bias <input type="range" id="d-bias" min="0" max="10" step="0.5" value="3"><span class="val" id="v-bias"></span></label>
+  <label for="d-cn">cable noise <input type="range" id="d-cn" min="0.02" max="1" step="0.02" value="0.16"><span class="val" id="v-cn"></span></label>
+  <button type="button" id="d-seed">New noise</button>
+</div>
+<canvas id="plot" height="420" aria-label="Plot of true and estimated spread, MCP and PIP angles over time"></canvas>
+<div class="legend"><span><i style="border-color:var(--muted);border-top-style:dashed"></i>truth</span><span><i style="border-color:var(--accent)"></i>estimate</span><span><i style="border-color:var(--band);border-top-width:8px"></i>±2σ</span><span><i style="border-color:var(--warn);border-top-width:8px;opacity:.4"></i>accel rejected</span></div>
+<div class="readout" id="rms"></div>
+<figcaption>Fig. 5. Things to try: palm down with accel only (no cable) and watch α's band grow; switch to handshake and θ₁ takes over. Turn the gate off to see the fast-motion window corrupt the angles. Turn the cable off and θ₂ has no source at all.</figcaption>
+</figure>
+</section>
+
+<section id="thumb">
+<h2><span class="no">07</span>Thumb</h2>
+<div class="col">
+<p>The thumb doesn't fit the hinge-chain template. Its base joint (CMC) has two non-orthogonal axes, and opposition is mostly a rotation there.</p>
+</div>
+<figure>
+<div class="sheet scroll">
+<svg viewBox="0 0 640 150" width="640" height="150" role="img" aria-label="Thumb kinematic chain from palm through CMC, MCP and IP joints, with the IMU on the proximal phalanx">
+  <path d="M30,95 H120" stroke="var(--ink)" stroke-width="3"/>
+  <text class="ts" x="30" y="120">palm H</text>
+  <circle cx="135" cy="95" r="13" fill="var(--panel)" stroke="var(--ink)" stroke-width="1.4"/><circle cx="135" cy="95" r="6" fill="none" stroke="var(--ink)" stroke-width="1.4"/>
+  <text class="tm" x="112" y="70">CMC β₁ β₂</text>
+  <path d="M148,95 L270,70" stroke="var(--ink)" stroke-width="3"/>
+  <text class="ts" x="180" y="100">metacarpal</text>
+  <circle cx="280" cy="68" r="9" fill="var(--panel)" stroke="var(--ink)" stroke-width="1.4"/>
+  <text class="tm" x="265" y="50">MCP β₃</text>
+  <path d="M289,66 L400,60" stroke="var(--ink)" stroke-width="3"/>
+  <rect x="330" y="46" width="24" height="12" rx="2" fill="var(--imu)"/>
+  <text class="ts" x="318" y="88" style="fill:var(--imu)">IMU S_thumb</text>
+  <circle cx="410" cy="60" r="9" fill="var(--panel)" stroke="var(--ink)" stroke-width="1.4"/>
+  <text class="tm" x="400" y="42">IP β₄</text>
+  <path d="M419,60 L500,62" stroke="var(--ink)" stroke-width="3"/>
+  <text class="ts" x="508" y="66">tip</text>
+  <path d="M60,82 C150,40 300,30 495,48" fill="none" stroke="var(--cable)" stroke-width="1.6" stroke-dasharray="6 4"/>
+  <text class="ts" x="520" y="40" style="fill:var(--cable)">cable spans MCP + IP</text>
+</svg>
+</div>
+<figcaption>Fig. 6. Thumb as a 4-DoF chain. The IMU on the proximal phalanx sees the combined rotation of CMC and MCP; the cable adds the curl that the IMU can't see.</figcaption>
+</figure>
+<div class="col">
+<div class="mathbox">\[ R_{HP_\mathrm{th}} = R_{H,\mathrm{CMC}}\;R_z(\beta_2)\,R_y(\beta_1)\;R_{\mathrm{off}}\;R_y(\beta_3), \qquad h_l = r_3\beta_3 + r_4\beta_4 \;(+\,r_1\beta_1 \text{ if the cable crosses CMC}) \]</div>
+<p>The IMU segment now turns with three joint angles, so its relative orientation to the palm is fully 3D. Same filter structure, 4 angles, 4 rates, 3 biases. Two differences:</p>
+<ul>
+<li><b>No hinge constraint.</b> All three gyro axes carry motion, so the bias is only observable through gravity, the cable and stillness updates. Heading about gravity drifts until one of those helps.</li>
+<li><b>β₁ vs β₃ is weakly separated.</b> Both bend the thumb toward the palm through similar axes. The joint limits and a prior that couples them (they usually move together in grasping) help. If it turns out too weak in the rig, a second IMU on the thumb metacarpal is the clean fix.</li>
+</ul>
+<p>For the class project this is the riskiest part of the estimator, so I'd get index and middle working first, then the thumb.</p>
+</div>
+</section>
+
+<section id="calib">
+<h2><span class="no">08</span>Calibration</h2>
+<div class="col">
+<p>Once per person and per glove fit. The order matters, since later steps use earlier results.</p>
+<ol class="steps">
+<li><b>Gyro bias at rest.</b> Hand still on the table for 2 s. Average the gyro.</li>
+<li><b>Flat hand, palm down.</b> Defines q = 0 and the cable zero \(n_0\). Gravity in each IMU gives two of three mount angles of \(R_{PS}\).</li>
+<li><b>Curl each finger alone</b> (MCP only, as much as possible). The dominant gyro axis is the knuckle axis \(\hat y\) in S. Together with step 2 this fixes \(R_{PS}\) completely.</li>
+<li><b>Fist, hook, pinches</b> (thumb to index tip, thumb to middle tip). Fit the cable curve \(l(\theta_1, \theta_2)\) by least squares, using θ₁ from the IMU. Pinches also tune thumb parameters so FK puts the tips together.</li>
+<li><b>Segment lengths.</b> From a ruler on the hand, or one scale factor on a standard hand.</li>
+<li><b>Time offset.</b> Rotate the hand quickly for a few seconds. Cross-correlate the hand gyro rate with the rate from successive tracker poses.</li>
+<li><b>Tendon stiffness \(k_c\).</b> From the fingertip force rig: commanded torque vs measured Δl with the finger blocked.</li>
+</ol>
+<p>Steps 1 to 3 take under a minute and should be repeated when the glove is put on again. Steps 4 to 7 are per person or per hardware change.</p>
+</div>
+</section>
+
+<section id="limits">
+<h2><span class="no">09</span>Known limits</h2>
+<div class="col">
+<ul>
+<li><b>Spread with the palm down</b> is gyro only, bounded by limits. Its σ tells retargeting when not to trust it.</li>
+<li><b>Model error</b> dominates once sensors are good: wrong segment lengths, moment arms and coupling factor c directly bias the tips. Expect fingertip errors of roughly a centimetre, not millimetres, without careful calibration.</li>
+<li><b>Skin and strap motion.</b> The IMU sits on soft tissue and moves relative to the bone during grasping.</li>
+<li><b>Cable during force rendering.</b> \(\tau/k_c\) handles linear stretch; friction in the guides adds hysteresis that a single constant won't capture.</li>
+<li><b>Slack.</b> In free motion the servo must keep the tendon taut, or Δl is meaningless. The rig's taut-tendon mode is exactly this.</li>
+<li><b>Ring and pinky</b> are copied from the middle finger.</li>
+</ul>
+</div>
+</section>
+
+<section id="refs">
+<h2><span class="no">10</span>Literature</h2>
+<div class="col">
+<p class="muted" style="font-size:14px">From memory; check the exact details before citing any of these in the report.</p>
+<ol class="refs">
+<li>J. Solà, "Quaternion kinematics for the error-state Kalman filter," arXiv:1711.02508, 2017. <a href="https://arxiv.org/abs/1711.02508" target="_blank" rel="noopener">arxiv.org/abs/1711.02508</a><span class="why">Reference for IMU models, rotation Jacobians and the error-state filter you would use for the palm filter.</span></li>
+<li>S. Thrun, W. Burgard, D. Fox, <i>Probabilistic Robotics</i>, MIT Press, 2005.<span class="why">EKF basics, chapter 3.</span></li>
+<li>D. Simon, "Kalman filtering with state constraints: a survey of linear and nonlinear algorithms," <i>IET Control Theory &amp; Applications</i>, 2010.<span class="why">Better ways to handle joint limits than clipping.</span></li>
+<li>H. G. Kortier, V. I. Sluiter, D. Roetenberg, P. H. Veltink, "Assessment of hand kinematics using inertial and magnetic sensors," <i>J. NeuroEngineering and Rehabilitation</i>, 2014.<span class="why">IMUs on every hand segment fused with a hand model; closest to our approach, with magnetometers we skip.</span></li>
+<li>J. Connolly, J. Condell, B. O'Flynn, J. T. Sanchez, P. Gardiner, "IMU sensor-based electronic goniometric glove for clinical finger movement analysis," <i>IEEE Sensors Journal</i>, 2018.<span class="why">Practical IMU glove, joint angles from relative IMU orientation.</span></li>
+<li>G. Santaera, E. Luberto, A. Serio, M. Gabiccini, A. Bicchi, "Low-cost, fast and accurate reconstruction of robotic and human postures via IMU measurements," ICRA 2015.<span class="why">IMUs plus a kinematic model, gyro bias handling, very similar structure.</span></li>
+<li>M. Bianchi, P. Salaris, A. Bicchi, "Synergy-based hand pose sensing: optimal glove design," <i>IJRR</i>, 2013.<span class="why">How to reconstruct many joints from few sensors with priors; relevant for the thumb and unmeasured fingers.</span></li>
+<li>H. Rijpkema, M. Girard, "Computer animation of knowledge-based human grasping," SIGGRAPH 1991.<span class="why">Commonly cited source for the DIP ≈ 2/3 PIP coupling.</span></li>
+<li>S. Madgwick, "An efficient orientation filter for inertial and inertial/magnetic sensor arrays," report, 2010.<span class="why">Simple complementary-style alternative for the palm filter.</span></li>
+<li>A. Handa et al., "DexPilot: Vision-based teleoperation of dexterous robotic hand-arm system," ICRA 2020. <a href="https://arxiv.org/abs/1910.03135" target="_blank" rel="noopener">arxiv.org/abs/1910.03135</a><span class="why">The next step: what the retargeting does with these fingertip estimates.</span></li>
+<li>Y. Qin et al., "AnyTeleop: A general vision-based dexterous robot arm-hand teleoperation system," RSS 2023. <a href="https://arxiv.org/abs/2307.04577" target="_blank" rel="noopener">arxiv.org/abs/2307.04577</a><span class="why">Source of the dex-retargeting optimizer.</span></li>
+</ol>
+</div>
+</section>
+</div>
+
+<script>
+(function () {
+  const C = 0.67, R1 = 8, R2 = 6, R3 = 5, KC = R2 + C * R3, G = 9.81;
+  const deg = Math.PI / 180;
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+  const NS = 'http://www.w3.org/2000/svg';
+  const el = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+
+  function drawFinger() {
+    const t1 = +document.getElementById('s-t1').value * deg;
+    const t2 = +document.getElementById('s-t2').value * deg;
+    const t3 = C * t2;
+    document.getElementById('v-t1').textContent = Math.round(t1 / deg) + '°';
+    document.getElementById('v-t2').textContent = Math.round(t2 / deg) + '°';
+    const svg = document.getElementById('finger');
+    svg.innerHTML = '';
+    const s = 2.6, ox = 190, oy = 95;
+    const P = (x, z) => [ox + x * s, oy - z * s];
+    const L = [45, 25, 20];
+    const phi = [t1, t1 + t2, t1 + t2 + t3];
+    const d = f => [Math.cos(f), -Math.sin(f)];
+    const n = f => [Math.sin(f), Math.cos(f)];
+    const j = [[0, 0]];
+    for (let i = 0; i < 3; i++) { const dd = d(phi[i]); j.push([j[i][0] + L[i] * dd[0], j[i][1] + L[i] * dd[1]]); }
+    el('line', { x1: P(-65, 0)[0], y1: P(-65, 0)[1], x2: P(0, 0)[0], y2: P(0, 0)[1], stroke: 'var(--ink)', 'stroke-width': 10, 'stroke-linecap': 'round', opacity: 0.25 }, svg);
+    el('text', { x: P(-62, -8)[0], y: P(-62, -8)[1] + 14, class: 'ts' }, svg).textContent = 'palm (metacarpal), H frame';
+    for (let i = 0; i < 3; i++) {
+      el('line', { x1: P(...j[i])[0], y1: P(...j[i])[1], x2: P(...j[i + 1])[0], y2: P(...j[i + 1])[1], stroke: 'var(--line)', 'stroke-width': 18 - i * 2, 'stroke-linecap': 'round' }, svg);
+    }
+    for (let i = 0; i < 3; i++) el('circle', { cx: P(...j[i])[0], cy: P(...j[i])[1], r: 5, fill: 'var(--panel)', stroke: 'var(--ink)', 'stroke-width': 1.3 }, svg);
+    const rr = [R1, R2, R3], phiB = [0, phi[0], phi[1]];
+    const pts = [[-50, R1]];
+    for (let i = 0; i < 3; i++) { const m = (phiB[i] + phi[i]) / 2, nn = n(m); pts.push([j[i][0] + rr[i] * nn[0], j[i][1] + rr[i] * nn[1]]); }
+    const nt = n(phi[2]), dt = d(phi[2]);
+    pts.push([j[2][0] + 12 * dt[0] + 4 * nt[0], j[2][1] + 12 * dt[1] + 4 * nt[1]]);
+    el('polyline', { points: pts.map(p => P(...p).join(',')).join(' '), fill: 'none', stroke: 'var(--cable)', 'stroke-width': 2 }, svg);
+    pts.slice(1, 4).forEach(p => el('circle', { cx: P(...p)[0], cy: P(...p)[1], r: 2.6, fill: 'var(--cable)' }, svg));
+    const len = pts => pts.slice(1).reduce((a, p, i) => a + Math.hypot(p[0] - pts[i][0], p[1] - pts[i][1]), 0);
+    const ref = [[-50, R1], [0, R1], [L[0], R2], [L[0] + L[1], R3], [L[0] + L[1] + 12, 4]];
+    const dlGeo = len(pts) - len(ref), dlLin = R1 * t1 + KC * t2;
+    const mid = [L[0] * 0.5 * Math.cos(t1) + 6 * Math.sin(t1), -L[0] * 0.5 * Math.sin(t1) + 6 * Math.cos(t1)];
+    const pm = P(...mid);
+    const g = el('g', { transform: `translate(${pm[0]},${pm[1]}) rotate(${t1 / deg})` }, svg);
+    el('rect', { x: -12, y: -6, width: 24, height: 12, rx: 2, fill: 'var(--imu)' }, g);
+    el('line', { x1: 0, y1: 0, x2: 34, y2: 0, stroke: 'var(--imu)', 'stroke-width': 1.4 }, g);
+    el('line', { x1: 0, y1: 0, x2: 0, y2: -30, stroke: 'var(--imu)', 'stroke-width': 1.4 }, g);
+    el('text', { x: 36, y: 4, class: 'tm', style: 'fill:var(--imu)' }, g).textContent = 'x_S';
+    el('text', { x: 4, y: -32, class: 'tm', style: 'fill:var(--imu)' }, g).textContent = 'z_S';
+    el('line', { x1: 560, y1: 40, x2: 560, y2: 110, stroke: 'var(--muted)', 'stroke-width': 1.6 }, svg);
+    el('path', { d: 'M554,102 L560,114 L566,102 z', fill: 'var(--muted)' }, svg);
+    el('text', { x: 540, y: 132, class: 'ts' }, svg).textContent = 'gravity';
+    const lbl = (i, txt) => { const p = P(...j[i]); el('text', { x: p[0] - 4, y: p[1] + 26, class: 'tm' }, svg).textContent = txt; };
+    lbl(0, 'MCP θ₁'); lbl(1, 'PIP θ₂'); lbl(2, 'DIP θ₃');
+    el('text', { x: 20, y: 285, class: 'ts', style: 'fill:var(--cable)' }, svg).textContent = 'cable along the back of the finger, offset r₁, r₂, r₃ at the joints';
+    const tip = j[3];
+    const fx = -G * Math.sin(t1), fz = G * Math.cos(t1);
+    document.getElementById('r-t3').textContent = (t3 / deg).toFixed(1) + '°';
+    document.getElementById('r-tip').textContent = `(${tip[0].toFixed(1)}, ${tip[1].toFixed(1)})`;
+    document.getElementById('r-acc').textContent = `x ${fx.toFixed(2)}, z ${fz.toFixed(2)} m/s²`;
+    document.getElementById('r-t1').textContent = (Math.atan2(-fx, fz) / deg).toFixed(1) + '°  = atan2(−f_x, f_z)';
+    document.getElementById('r-dl').textContent = `${dlGeo.toFixed(2)} / ${dlLin.toFixed(2)} mm`;
+    document.getElementById('r-t2').textContent = (((dlGeo - R1 * t1) / KC) / deg).toFixed(1) + '° (linear model)';
+  }
+  ['s-t1', 's-t2'].forEach(id => document.getElementById(id).addEventListener('input', drawFinger));
+  drawFinger();
+
+  function mulberry(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+  function gauss(r) { let u = 0; while (u === 0) u = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * r()); }
+  const ryT = (t, v) => { const c = Math.cos(t), s = Math.sin(t); return [c * v[0] - s * v[2], v[1], s * v[0] + c * v[2]]; };
+  const rzT = (t, v) => { const c = Math.cos(t), s = Math.sin(t); return [c * v[0] + s * v[1], -s * v[0] + c * v[1], v[2]]; };
+  const gH = roll => [0, Math.sin(roll) * G, Math.cos(roll) * G];
+  const hAcc = (x, roll) => ryT(x[1], rzT(x[0], gH(roll)));
+  const hGyro = x => [-Math.sin(x[1]) * x[3] + x[6], x[4] + x[7], Math.cos(x[1]) * x[3] + x[8]];
+  const hCab = x => [R1 * x[1] + KC * x[2]];
+  const LO = [-0.35, -0.35, 0], HI = [0.35, 1.6, 1.9];
+
+  const zeros = (r, c) => Array.from({ length: r }, () => new Array(c).fill(0));
+  function inv(A) {
+    const n = A.length, M = A.map((row, i) => [...row, ...Array.from({ length: n }, (_, k) => (k === i ? 1 : 0))]);
+    for (let i = 0; i < n; i++) {
+      let p = i; for (let r = i + 1; r < n; r++) if (Math.abs(M[r][i]) > Math.abs(M[p][i])) p = r;
+      [M[i], M[p]] = [M[p], M[i]];
+      const d = M[i][i]; for (let k = 0; k < 2 * n; k++) M[i][k] /= d;
+      for (let r = 0; r < n; r++) if (r !== i) { const f = M[r][i]; for (let k = 0; k < 2 * n; k++) M[r][k] -= f * M[i][k]; }
+    }
+    return M.map(row => row.slice(n));
+  }
+
+  function update(x, P, z, hf, Rv, gate) {
+    const h0 = hf(x), m = h0.length, H = zeros(m, 9), eps = 1e-6;
+    for (let k = 0; k < 9; k++) { const xp = x.slice(); xp[k] += eps; const h1 = hf(xp); for (let i = 0; i < m; i++) H[i][k] = (h1[i] - h0[i]) / eps; }
+    const y = z.map((v, i) => v - h0[i]);
+    const PHt = zeros(9, m);
+    for (let i = 0; i < 9; i++) for (let j = 0; j < m; j++) { let s = 0; for (let k = 0; k < 9; k++) s += P[i][k] * H[j][k]; PHt[i][j] = s; }
+    const S = zeros(m, m);
+    for (let i = 0; i < m; i++) for (let j = 0; j < m; j++) { let s = 0; for (let k = 0; k < 9; k++) s += H[i][k] * PHt[k][j]; S[i][j] = s + (i === j ? Rv : 0); }
+    const Si = inv(S);
+    if (gate) { let d2 = 0; for (let i = 0; i < m; i++) for (let j = 0; j < m; j++) d2 += y[i] * Si[i][j] * y[j]; if (d2 > gate) return false; }
+    const K = zeros(9, m);
+    for (let i = 0; i < 9; i++) for (let j = 0; j < m; j++) { let s = 0; for (let k = 0; k < m; k++) s += PHt[i][k] * Si[k][j]; K[i][j] = s; }
+    for (let i = 0; i < 9; i++) { let s = 0; for (let j = 0; j < m; j++) s += K[i][j] * y[j]; x[i] += s; }
+    const KHP = zeros(9, 9);
+    for (let i = 0; i < 9; i++) for (let j = 0; j < 9; j++) { let s = 0; for (let k = 0; k < m; k++) s += K[i][k] * PHt[j][k]; KHP[i][j] = s; }
+    for (let i = 0; i < 9; i++) for (let j = 0; j < 9; j++) P[i][j] -= KHP[i][j];
+    for (let i = 0; i < 9; i++) for (let j = i + 1; j < 9; j++) { const a = 0.5 * (P[i][j] + P[j][i]); P[i][j] = a; P[j][i] = a; }
+    for (let i = 0; i < 3; i++) if (x[i] < LO[i] || x[i] > HI[i]) { x[i] = Math.min(HI[i], Math.max(LO[i], x[i])); x[i + 3] = 0; }
+    return true;
+  }
+
+  let seed = 7;
+  function simulate() {
+    const opt = {
+      gyro: document.getElementById('d-gyro').checked,
+      acc: document.getElementById('d-acc').checked,
+      cable: document.getElementById('d-cable').checked,
+      gate: document.getElementById('d-gate').checked,
+      shake: document.getElementById('d-shake').checked,
+      pose: document.getElementById('d-pose').value,
+      bias: +document.getElementById('d-bias').value * deg,
+      cn: +document.getElementById('d-cn').value
+    };
+    document.getElementById('v-bias').textContent = (+document.getElementById('d-bias').value).toFixed(1) + ' °/s';
+    document.getElementById('v-cn').textContent = opt.cn.toFixed(2) + ' mm';
+    const r = mulberry(seed), dt = 0.002, T = 12, N = Math.round(T / dt);
+    const sg = 0.01, sa = 0.08, w = 2 * Math.PI * 0.35, wa = 2 * Math.PI * 0.21;
+    const bdir = [0.6, -0.5, 0.62], bn = Math.hypot(...bdir);
+    let bTrue = bdir.map(v => v / bn * opt.bias);
+    const rollAt = t => opt.pose === 'down' ? 0 : opt.pose === 'side' ? Math.PI / 2 : opt.pose === 'mid' ? Math.PI / 4 : Math.min(1, Math.max(0, (t - 2) / 8)) * Math.PI / 2;
+    const x = [0, 0.3, 0.3, 0, 0, 0, 0, 0, 0];
+    const P = zeros(9, 9); [0.09, 0.09, 0.09, 0.25, 0.25, 0.25, 0.0025, 0.0025, 0.0025].forEach((v, i) => P[i][i] = v);
+    const qv = 36, qb = 1e-6;
+    const out = { t: [], tr: [[], [], []], es: [[], [], []], sd: [[], [], []], rej: [] };
+    for (let k = 0; k < N; k++) {
+      const t = k * dt, roll = rollAt(t);
+      const tr = [0.12 * Math.sin(wa * t + 0.3), 0.55 + 0.5 * Math.sin(w * t), 0.75 + 0.6 * Math.sin(w * t + 0.9)];
+      const trd = [0.12 * wa * Math.cos(wa * t + 0.3), 0.5 * w * Math.cos(w * t), 0.6 * w * Math.cos(w * t + 0.9)];
+      bTrue = bTrue.map(b => b + 1e-3 * Math.sqrt(dt) * gauss(r));
+      const xt = [...tr, ...trd, ...bTrue];
+      for (let i = 0; i < 3; i++) x[i] += dt * x[i + 3];
+      for (let i = 0; i < 3; i++) for (let j = 0; j < 9; j++) P[i][j] += dt * P[i + 3][j];
+      for (let i = 0; i < 9; i++) for (let j = 0; j < 3; j++) P[i][j] += dt * P[i][j + 3];
+      for (let i = 3; i < 6; i++) P[i][i] += qv * dt;
+      for (let i = 6; i < 9; i++) P[i][i] += qb * dt;
+      if (opt.gyro) { const z = hGyro(xt).map(v => v + sg * gauss(r)); update(x, P, z, hGyro, sg * sg, 0); }
+      if (opt.cable) { const z = hCab(xt).map(v => v + opt.cn * gauss(r)); update(x, P, z, hCab, opt.cn * opt.cn, 0); }
+      let rejected = false;
+      if (opt.acc) {
+        let f = hAcc(xt, roll).map(v => v + sa * gauss(r));
+        if (opt.shake && t > 5 && t < 7) f = [f[0] + 6 * Math.sin(2 * Math.PI * 5 * t), f[1] + 6 * Math.cos(2 * Math.PI * 3.7 * t), f[2] + 3 * Math.sin(2 * Math.PI * 4.3 * t)];
+        let ok = true;
+        if (opt.gate && Math.abs(Math.hypot(...f) - G) > 0.6) ok = false;
+        if (ok) ok = update(x, P, f, xx => hAcc(xx, roll), 0.09, opt.gate ? 11.3 : 0);
+        rejected = !ok;
+      }
+      if (k % 4 === 0) {
+        out.t.push(t);
+        for (let i = 0; i < 3; i++) { out.tr[i].push(tr[i]); out.es[i].push(x[i]); out.sd[i].push(Math.sqrt(Math.max(0, P[i][i]))); }
+        out.rej.push(rejected);
+      }
+    }
+    return out;
+  }
+
+  let last = null;
+  function plot(o) {
+    const cv = document.getElementById('plot'), dpr = window.devicePixelRatio || 1;
+    const W = cv.clientWidth, Hh = 420;
+    cv.width = W * dpr; cv.height = Hh * dpr; cv.style.height = Hh + 'px';
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, Hh);
+    const cInk = css('--ink'), cMuted = css('--muted'), cLine = css('--line'), cAcc = css('--accent'), cBand = css('--band'), cWarn = css('--warn');
+    const names = ['α spread', 'θ₁ MCP', 'θ₂ PIP'], ranges = [[-30, 30], [-20, 100], [-10, 120]];
+    const left = 46, right = 10, rowH = 130, top = 8, T = 12;
+    const X = t => left + (W - left - right) * t / T;
+    g.font = '11px "IBM Plex Mono", monospace';
+    for (let i = 0; i < 3; i++) {
+      const y0 = top + i * (rowH + 8), [lo, hi] = ranges[i];
+      const Y = v => y0 + rowH - (v / deg - lo) / (hi - lo) * rowH;
+      g.fillStyle = cWarn; g.globalAlpha = 0.12;
+      o.rej.forEach((rj, k) => { if (rj) g.fillRect(X(o.t[k]), y0, Math.max(1, X(o.t[1]) - X(o.t[0])) + 0.5, rowH); });
+      g.globalAlpha = 1;
+      g.strokeStyle = cLine; g.lineWidth = 1;
+      const step = (hi - lo) > 80 ? 30 : 15;
+      for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) {
+        const yy = y0 + rowH - (v - lo) / (hi - lo) * rowH;
+        g.beginPath(); g.moveTo(left, yy); g.lineTo(W - right, yy); g.stroke();
+        g.fillStyle = cMuted; g.textAlign = 'right'; g.fillText(v + '°', left - 6, yy + 4);
+      }
+      g.fillStyle = cBand; g.beginPath();
+      o.t.forEach((t, k) => { const yy = Y(o.es[i][k] + 2 * o.sd[i][k]); k ? g.lineTo(X(t), Math.max(y0, yy)) : g.moveTo(X(t), Math.max(y0, yy)); });
+      for (let k = o.t.length - 1; k >= 0; k--) g.lineTo(X(o.t[k]), Math.min(y0 + rowH, Y(o.es[i][k] - 2 * o.sd[i][k])));
+      g.closePath(); g.fill();
+      g.strokeStyle = cMuted; g.setLineDash([5, 4]); g.lineWidth = 1.4; g.beginPath();
+      o.t.forEach((t, k) => k ? g.lineTo(X(t), Y(o.tr[i][k])) : g.moveTo(X(t), Y(o.tr[i][k]))); g.stroke(); g.setLineDash([]);
+      g.strokeStyle = cAcc; g.lineWidth = 1.8; g.beginPath();
+      o.t.forEach((t, k) => { const yy = Math.min(y0 + rowH, Math.max(y0, Y(o.es[i][k]))); k ? g.lineTo(X(t), yy) : g.moveTo(X(t), yy); }); g.stroke();
+      g.fillStyle = cInk; g.textAlign = 'left'; g.font = '600 12px "IBM Plex Sans", sans-serif'; g.fillText(names[i], left + 6, y0 + 14); g.font = '11px "IBM Plex Mono", monospace';
+    }
+    g.fillStyle = cMuted; g.textAlign = 'center';
+    for (let t = 0; t <= T; t += 2) g.fillText(t + ' s', X(t), Hh - 2);
+    const rms = [0, 1, 2].map(i => { let s = 0, n = 0; o.t.forEach((t, k) => { if (t > 2) { s += (o.es[i][k] - o.tr[i][k]) ** 2; n++; } }); return Math.sqrt(s / n) / deg; });
+    const endSd = [0, 1, 2].map(i => o.sd[i][o.sd[i].length - 1] / deg);
+    document.getElementById('rms').innerHTML = names.map((nm, i) => `<div><b>${nm}</b><span>RMS ${rms[i].toFixed(1)}° · σ end ${endSd[i].toFixed(1)}°</span></div>`).join('');
+  }
+  function run() { last = simulate(); plot(last); }
+  ['d-gyro', 'd-acc', 'd-cable', 'd-gate', 'd-shake', 'd-pose'].forEach(id => document.getElementById(id).addEventListener('change', run));
+  ['d-bias', 'd-cn'].forEach(id => document.getElementById(id).addEventListener('input', run));
+  document.getElementById('d-seed').addEventListener('click', () => { seed = (seed * 9301 + 49297) % 233280; run(); });
+  window.addEventListener('resize', () => last && plot(last));
+  try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => last && plot(last)); } catch (e) {}
+  new MutationObserver(() => last && plot(last)).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  run();
+})();
+</script>
+
+</body></html>
