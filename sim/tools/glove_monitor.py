@@ -40,7 +40,8 @@ def main() -> None:
                 print(f"no glove state ({s['frames']} frames, crc errors {s['crc_errors']})")
                 continue
             flags = [n for n, v in (("KILL", state.kill), ("torque on", state.torque_on),
-                                    ("timeout", state.timeout), ("stub", state.stub)) if v]
+                                    ("timeout", state.timeout), ("stub", state.stub),
+                                    ("FAULT", state.fault)) if v]
             rtt = (f"rtt mean {r.mean():.2f} p99 {np.percentile(r, 99):.2f} max {r.max():.2f} ms" if len(r)
                    else "no rtt")
             print(f"{s['frames']} Hz, lost {s['lost']}, crc {s['crc_errors']}, {rtt}, "

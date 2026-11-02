@@ -17,7 +17,7 @@ hand:
   weld_solimp: [0.99, 0.999, 0.001, 0.5, 2]
 
 input:
-  pose_source: viewer              # viewer | fixed | vive
+  pose_source: vive              # viewer | fixed | vive
   finger_source: viewer            # viewer | script | trigger | glove
   script:
     period: 4.0
@@ -48,9 +48,9 @@ glove:
   udp_port: 9880                   # sim listens here for the fake glove
   torque_scale: 0.1                # servo Nm per unit of sim feedback (sim fingers 2 Nm max, XL330 ~0.2 Nm)
   torque_limit: 0.2                # Nm, upper bound sent to the glove
-  filter_hz: 15                    # Hz, low-pass on sim feedback before sending, 0 = off
+  filter_hz: 0                     # Hz, low-pass on sim feedback before sending, 0 = off
   damping: 0.0                     # Nm s per unit closure, glove-side damping on closing speed while in contact
-  slew_rate: 10                    # Nm/s, glove-side torque rate limit, 0 = off
+  slew_rate: 50                    # Nm/s, glove-side torque rate limit, 0 = off
   timeout: 0.05                    # s without glove state before the viewer sliders take over
 
 unreal:

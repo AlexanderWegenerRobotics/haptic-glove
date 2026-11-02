@@ -16,6 +16,7 @@ constexpr uint8_t STATE_KILL = 1;
 constexpr uint8_t STATE_TORQUE_ON = 2;
 constexpr uint8_t STATE_TIMEOUT = 4;
 constexpr uint8_t STATE_STUB = 8;
+constexpr uint8_t STATE_FAULT = 16;
 constexpr uint8_t FEEDBACK_ENABLE = 1;
 
 #pragma pack(push, 1)

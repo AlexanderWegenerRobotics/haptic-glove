@@ -42,4 +42,5 @@ logs/
 ~$*
 
 .env
-secrets.h
+secrets.h
+rendering/Windows/

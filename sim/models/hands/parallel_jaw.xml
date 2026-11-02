@@ -3,9 +3,9 @@
 
   <default>
     <default class="gripper">
-      <joint type="slide" damping="2" armature="0.01"/>
+      <joint type="slide" damping="0.2" armature="0.001"/>
       <geom type="box" density="1000" friction="1.0 0.01 0.001" condim="4" rgba="0.35 0.35 0.4 1"/>
-      <position kp="800" kv="15" ctrlrange="0 0.04"/>
+      <position kp="800" kv="3" ctrlrange="0 0.04"/>
     </default>
   </default>
 
@@ -36,7 +36,7 @@
   </contact>
 
   <equality>
-    <joint joint1="jaw_right" joint2="jaw_left" polycoef="0 1 0 0 0"/>
+    <joint solref="0.002 1" joint1="jaw_right" joint2="jaw_left" polycoef="0 1 0 0 0"/>
   </equality>
 
   <actuator>

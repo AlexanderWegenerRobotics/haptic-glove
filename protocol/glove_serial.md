@@ -36,7 +36,7 @@ A frame with a wrong CRC is dropped and the parser resyncs on the next sync byte
 | closure | 3 × f32 | thumb, index, middle; 0 open, 1 closed |
 | torque | 3 × f32 | measured servo torque in Nm (from present current), 0 on the stub |
 | rtt_us | u32 | last measured round trip in µs, 0 before the first feedback |
-| flags | u8 | bit 0 kill switch pressed, bit 1 torque on, bit 2 feedback timeout, bit 3 stub servos |
+| flags | u8 | bit 0 kill switch pressed, bit 1 torque on, bit 2 feedback timeout, bit 3 stub servos, bit 4 servo fault (a servo lost or reporting a hardware error) |
 
 ## Feedback, host to glove (type 0x02, 33 bytes)
 
@@ -54,10 +54,12 @@ Damping and slew come from `glove:` in `config/sim.yaml`, so they can be tuned w
 
 ## Torque shaping on the glove
 
-Per channel, every state period: closing velocity from the closure, low-passed at `VELOCITY_FILTER_HZ`. While the commanded torque is above 0, the target is `torque + damping × max(velocity, 0)`, clamped to [0, `TORQUE_LIMIT`]; otherwise 0. The output moves toward the target by at most `slew × dt`. Disabling (kill switch, timeout, enable 0) sets the output to 0 at once, without slew.
+Per channel, every state period: closing velocity from the closure, low-passed at `VELOCITY_FILTER_HZ`. While the commanded torque is above 0, the target is `torque + damping × max(velocity, 0)`, clamped to [0, `TORQUE_LIMIT`]; otherwise 0. The output moves toward the target by at most `slew × dt`. Disabling (kill switch, timeout, enable 0, servo fault) sets the output to 0 at once, without slew. Enabling again scales the target from 0 to full over `ENABLE_RAMP_S` (0.8 s), so a finger that was closed deep into an object while torque was off is pushed back gently instead of snapped open.
 
 ## Safety
 
-- The glove only renders torque while all of these hold: enable bit set, kill switch released, a valid feedback frame within the last 50 ms (`FEEDBACK_TIMEOUT_US`).
+- The glove only renders torque while all of these hold: enable bit set, kill switch released, a valid feedback frame within the last 50 ms (`FEEDBACK_TIMEOUT_US`), no servo fault.
+- Servo fault: a servo that misses `SERVO_LOST_CYCLES` replies in a row (50 ms) counts as lost; a hardware error alert in its status counts too. All torque stays off until it answers again and has been re-initialized (alerts are cleared by a reboot instruction, at most one per second).
+- Each servo's bus watchdog (100 ms) stops it on its own if the ESP stops sending, e.g. after a reset, a crash or losing USB power.
 - Torques are clamped to [0, `TORQUE_LIMIT`] and damping to [0, `DAMPING_LIMIT`] on the glove; NaN or negative values become 0. The glove never pushes the fingers open.
 - The host low-passes the sim feedback (`glove.filter_hz`), scales it with `glove.torque_scale` and clamps to `glove.torque_limit` (`config/sim.yaml`).

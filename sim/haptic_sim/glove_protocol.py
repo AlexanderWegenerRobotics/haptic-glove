@@ -16,6 +16,7 @@ STATE_KILL = 1
 STATE_TORQUE_ON = 2
 STATE_TIMEOUT = 4
 STATE_STUB = 8
+STATE_FAULT = 16
 FEEDBACK_ENABLE = 1
 U32 = 1 << 32
 
@@ -48,6 +49,11 @@ class GloveState:
     def stub(self) -> bool:
         '''Firmware runs the servo stub.'''
         return bool(self.flags & STATE_STUB)
+
+    @property
+    def fault(self) -> bool:
+        '''A servo is lost or reports a hardware error, torque is off.'''
+        return bool(self.flags & STATE_FAULT)
 
 
 @dataclass

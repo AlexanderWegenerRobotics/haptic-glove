@@ -111,6 +111,30 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category = "Recording")
 	FString FfmpegPath;
 
+	UPROPERTY(Config, EditAnywhere, Category = "Voice")
+	bool bVoiceCommands = true;
+
+	/** Python with faster-whisper, silero-vad and pyaudio, see Voice/README.md; a bare name is looked up on PATH. */
+	UPROPERTY(Config, EditAnywhere, Category = "Voice")
+	FString VoicePython = TEXT("python");
+
+	/** Sidecar script, relative to the project folder. */
+	UPROPERTY(Config, EditAnywhere, Category = "Voice")
+	FString VoiceScript = TEXT("Voice/voice_commands.py");
+
+	UPROPERTY(Config, EditAnywhere, Category = "Voice")
+	int32 VoicePort = 9873;
+
+	/** Whisper model: tiny.en | base.en | small.en | medium.en. */
+	UPROPERTY(Config, EditAnywhere, Category = "Voice")
+	FString VoiceModel = TEXT("small.en");
+
+	UPROPERTY(Config, EditAnywhere, Category = "Voice")
+	bool bVoiceOnGpu = true;
+
+	UPROPERTY(Config, EditAnywhere, Category = "Voice", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float VoiceMinConfidence = 0.5f;
+
 	UPROPERTY(Config, EditAnywhere, Category = "Environments")
 	TMap<FString, FHapticEnvironment> Environments;
 

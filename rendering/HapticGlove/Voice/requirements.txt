@@ -1,0 +1,6 @@
+numpy
+pyaudio
+torch
+torchaudio
+silero-vad>=5.1
+faster-whisper>=1.0

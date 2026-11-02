@@ -17,4 +17,7 @@ public:
 
     /** True for the stand-in without hardware. */
     virtual bool is_stub() const { return false; }
+
+    /** True while a servo is lost or reports a hardware error; torque must stay off. */
+    virtual bool fault() const { return false; }
 };

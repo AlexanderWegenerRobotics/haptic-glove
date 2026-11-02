@@ -170,6 +170,10 @@ class GloveLink:
             print(f"glove connected{' (servo stub)' if state.stub else ''}")
         if previous is not None and state.kill != previous.kill:
             print("glove kill switch " + ("pressed, torque off" if state.kill else "released"))
+        if previous is not None and state.fault != previous.fault:
+            print("glove servo fault, torque off" if state.fault else "glove servo fault cleared")
+        if previous is not None and state.stub != previous.stub:
+            print("glove servos " + ("lost, running the stub" if state.stub else "found"))
 
 
 _links: dict = {}
